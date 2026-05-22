@@ -1,12 +1,13 @@
 import { BenchmarkChart } from "@/components/BenchmarkChart";
 import { KpiTile } from "@/components/KpiTile";
+import { OpenPositions, type Position } from "@/components/OpenPositions";
 import { sql } from "@/lib/db";
 import {
   alignSeries,
   comparePerformance,
   fetchSpyHistory,
 } from "@/lib/benchmark";
-import { formatPct } from "@/lib/utils";
+import { formatCurrency, formatPct } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -24,6 +25,14 @@ async function loadPerformance() {
     ORDER BY started_at ASC
     LIMIT 1
   `;
+
+  const positions = (await sql<Position>`
+    SELECT symbol, asset_class, qty, avg_entry, market_value, unrealized_pl,
+           option_type, strike, expiry
+    FROM positions
+    WHERE snapshot_at > now() - interval '1 day'
+    ORDER BY market_value DESC
+  `) as Position[];
 
   // Figure out how far back to fetch SPY based on the journal's earliest
   // date (with a sensible minimum + cap).
@@ -55,7 +64,7 @@ async function loadPerformance() {
     : [];
   const metrics = comparePerformance(aligned);
 
-  return { equityCurve, aligned, metrics, startEquity, benchmarkError };
+  return { equityCurve, aligned, metrics, startEquity, benchmarkError, positions };
 }
 
 export default async function PerformancePage() {
@@ -76,8 +85,9 @@ export default async function PerformancePage() {
     );
   }
 
-  const { aligned, metrics, benchmarkError } = data;
+  const { aligned, metrics, benchmarkError, positions } = data;
   const beating = metrics.alphaPct >= 0;
+  const investedValue = positions.reduce((sum, p) => sum + Number(p.market_value ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -166,6 +176,20 @@ export default async function PerformancePage() {
           />
         </div>
       </div>
+
+      {/* Current holdings — what's driving the performance right now */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-mono text-neutral-400 uppercase tracking-wider">
+            Current holdings
+          </h2>
+          <span className="text-xs text-neutral-600 font-mono">
+            {positions.length} {positions.length === 1 ? "position" : "positions"} ·{" "}
+            {formatCurrency(investedValue)} invested
+          </span>
+        </div>
+        <OpenPositions positions={positions} />
+      </section>
 
       {/* Honesty footer */}
       <div className="rounded-lg border border-neutral-800 p-4 text-xs text-neutral-500 leading-relaxed">
