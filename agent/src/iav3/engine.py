@@ -308,12 +308,13 @@ def run_cycle(settings: Settings, *, verbose: bool = True) -> str:
             log(f"  HOLD {symbol} (target={target}, "
                 f"{'in position' if symbol in held else 'flat'})")
 
-        # ---- options overlay (phase 3.3, log-only first run) ---------------
+        # ---- options overlay (live submission) -----------------------------
         # When ENABLE_OPTIONS_OVERLAY=true AND the trend filter is ON for this
-        # symbol, consult LongCallOverlay. For this iteration the decision is
-        # LOGGED only — order placement comes in a follow-up commit that wires
-        # broker.submit_option_order. This lets us see what the overlay would
-        # do without actually trading options yet.
+        # symbol, consult LongCallOverlay AND actually submit the order via
+        # broker.submit_option_order. The overlay's own gates (IV rank, DTE,
+        # liquidity, sizing) run first; the broker then attempts the limit
+        # order at mid. PaperBroker raises NotImplementedError — only the
+        # Alpaca-backed paper/live path supports option orders.
         if settings.enable_options_overlay and target == 1:
             try:
                 from .data import AlpacaOptionsFeed
@@ -324,24 +325,55 @@ def run_cycle(settings: Settings, *, verbose: bool = True) -> str:
                     underlying=symbol, spot=price, trend_on=True,
                     available_cash=pv.cash, equity=pv.equity,
                 )
-                if oc_decision.is_opening:
-                    log(f"  [cyan]OVERLAY[/cyan] {symbol}: would buy "
-                        f"{oc_decision.contracts}x calls — {oc_decision.rationale}")
+                if oc_decision.is_opening and oc_decision.contract and oc_decision.quote:
+                    contract = oc_decision.contract
+                    quote = oc_decision.quote
+                    # Limit at mid. Tighter than buying at ask, still likely to
+                    # fill in liquid names; if it doesn't fill, no harm done
+                    # (DAY TIF, order auto-cancels at close).
+                    try:
+                        broker_result = broker.submit_option_order(
+                            symbol=contract.symbol,
+                            qty=oc_decision.contracts,
+                            side="BUY",
+                            limit_price=round(quote.mid, 2),
+                        )
+                        status = broker_result.status
+                        broker_order_id = broker_result.order_id
+                        log(f"  [cyan]OVERLAY[/cyan] {symbol}: BUY "
+                            f"{oc_decision.contracts}x {contract.symbol} @ "
+                            f"${quote.mid:.2f} (limit) — order {broker_order_id}, "
+                            f"status {status}")
+                    except NotImplementedError:
+                        # PaperBroker path — log only, don't fail the cycle
+                        status = "blocked_paper_broker"
+                        broker_order_id = None
+                        log(f"  [yellow]OVERLAY[/yellow] {symbol}: would buy "
+                            f"{oc_decision.contracts}x calls but in-process "
+                            f"PaperBroker doesn't support options. Use Alpaca.")
+                    except Exception as oe:
+                        status = "rejected"
+                        broker_order_id = None
+                        log(f"  [red]OVERLAY[/red] {symbol}: option order "
+                            f"rejected — {oe}")
+
+                    # Always persist the attempt to Neon for audit
                     if neon and session_id is not None:
                         _safe_neon(
-                            lambda r=oc_decision.rationale: neon.record_order(
+                            lambda r=oc_decision.rationale, st=status,
+                                bid=broker_order_id, c=contract, q=quote,
+                                n=oc_decision.contracts: neon.record_order(
                                 session_id=session_id,
                                 symbol=symbol, asset_class="option", side="BUY",
                                 option_type="call",
-                                strike=oc_decision.contract.strike,
-                                expiry=oc_decision.contract.expiry,
-                                qty=oc_decision.contracts,
-                                price=oc_decision.quote.mid,
-                                status="submitted", reason="overlay_would_open",
+                                strike=c.strike, expiry=c.expiry,
+                                qty=n, price=q.mid,
+                                status=st, reason="long_call_overlay",
+                                broker_order_id=bid,
                                 advisor_rationale=r,
                             ),
                             log,
-                            f"overlay_log({symbol})",
+                            f"overlay_record({symbol})",
                         )
                 elif oc_decision.is_block:
                     log(f"  [dim]overlay {symbol}: {oc_decision.action} — "

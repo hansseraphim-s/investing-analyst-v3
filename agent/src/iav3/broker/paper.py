@@ -144,6 +144,22 @@ class PaperBroker:
         # No resting orders in the paper model (fills are immediate).
         return None
 
+    def submit_option_order(
+        self,
+        symbol: str,
+        qty: int,
+        side: str,
+        limit_price: float,
+    ) -> OrderResult:
+        # The in-process simulator doesn't model the options chain — for
+        # options-aware paper trading, switch to AlpacaBroker pointed at the
+        # Alpaca paper endpoint (the default when keys are set in .env).
+        raise NotImplementedError(
+            "PaperBroker (in-process simulator) does not support option orders. "
+            "Set ALPACA_API_KEY and ALPACA_SECRET_KEY in .env to use AlpacaBroker "
+            "against the paper endpoint, which handles options."
+        )
+
     def mark(self, prices: dict[str, float]) -> list[str]:
         """Apply current prices; auto-close any position whose bracket triggered.
 

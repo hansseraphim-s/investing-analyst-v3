@@ -101,3 +101,46 @@ class AlpacaBroker:
 
     def cancel_all_orders(self) -> None:
         self._client.cancel_orders()
+
+    def submit_option_order(
+        self,
+        symbol: str,
+        qty: int,
+        side: str,
+        limit_price: float,
+    ) -> OrderResult:
+        """Submit a single-leg option order at a limit price.
+
+        Why limit, not market: option spreads can be 10-30% wide. A market
+        order on options is a great way to pay 20% above mid; the live
+        wheel + long-call overlay both compute mid and pass it here.
+
+        Why DAY TIF: Alpaca rejects GTC for option orders. DAY is the only
+        option-compatible TIF.
+        """
+        from alpaca.trading.enums import OrderSide, TimeInForce
+        from alpaca.trading.requests import LimitOrderRequest
+
+        side_upper = side.upper()
+        if side_upper not in {"BUY", "SELL"}:
+            raise ValueError(f"submit_option_order side must be BUY or SELL; got {side!r}")
+        if limit_price <= 0:
+            raise ValueError(f"limit_price must be > 0; got {limit_price}")
+        if qty <= 0:
+            raise ValueError(f"qty must be > 0; got {qty}")
+
+        req = LimitOrderRequest(
+            symbol=symbol,
+            qty=qty,
+            side=OrderSide.BUY if side_upper == "BUY" else OrderSide.SELL,
+            time_in_force=TimeInForce.DAY,
+            limit_price=round(limit_price, 2),
+        )
+        order = self._client.submit_order(req)
+        return OrderResult(
+            order_id=str(order.id),
+            symbol=symbol,
+            qty=qty,
+            side=side_upper,
+            status=str(order.status),
+        )

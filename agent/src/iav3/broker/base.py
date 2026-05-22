@@ -80,3 +80,22 @@ class Broker(Protocol):
     def close_position(self, symbol: str) -> OrderResult: ...
 
     def cancel_all_orders(self) -> None: ...
+
+    def submit_option_order(
+        self,
+        symbol: str,
+        qty: int,
+        side: str,
+        limit_price: float,
+    ) -> OrderResult:
+        """Single-leg option order at a limit price.
+
+        `symbol` is the OCC-formatted contract identifier (e.g.
+        AAPL250620C00200000). `side` is BUY for opening long calls/puts or
+        closing short legs, SELL for opening short legs (cash-secured /
+        covered only) or closing longs. Time-in-force is always DAY for
+        options (Alpaca rejects GTC). No bracket — long-call max loss is
+        bounded by premium paid; short-leg defined-risk safety is enforced
+        upstream in WheelLive via cash/share coverage checks.
+        """
+        ...
