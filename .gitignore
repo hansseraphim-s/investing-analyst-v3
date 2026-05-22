@@ -40,5 +40,8 @@ pnpm-debug.log*
 *.sqlite
 *.sqlite3
 journal.db
-data/
+/data/
 .cache/
+
+# Local IV history (populated by the agent at runtime)
+.iav3/
