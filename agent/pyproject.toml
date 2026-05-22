@@ -40,7 +40,7 @@ dashboard = [
 ]
 
 [project.scripts]
-iav3 = "iav3.cli:app"
+iav3 = "iav3.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
