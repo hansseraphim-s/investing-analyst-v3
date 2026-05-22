@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- launchd job for the iav3 paper trading cycle.
+     Fires Monday-Friday at 12:50 PM Pacific (= 3:50 PM Eastern, 10 min
+     before NYSE close). Adjust StartCalendarInterval Hour/Minute if you
+     change timezone or move to ET.
+
+     Install:   bash scripts/install-launchd.sh
+     Uninstall: bash scripts/uninstall-launchd.sh
+     Logs:      ~/Library/Logs/iav3/paper-YYYY-MM-DD.log -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.fairwinds.iav3-paper</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/hansmseraphim/iav3/scripts/iav3-paper-wrapper.sh</string>
+    </array>
+
+    <!-- Mon-Fri at 12:50 PM PT (Weekday 1=Mon … 5=Fri).
+         launchd's StartCalendarInterval uses LOCAL time, so this auto-shifts
+         with DST if the machine's timezone tracks DST. -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Weekday</key><integer>1</integer>
+            <key>Hour</key><integer>12</integer>
+            <key>Minute</key><integer>50</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>2</integer>
+            <key>Hour</key><integer>12</integer>
+            <key>Minute</key><integer>50</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>3</integer>
+            <key>Hour</key><integer>12</integer>
+            <key>Minute</key><integer>50</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>4</integer>
+            <key>Hour</key><integer>12</integer>
+            <key>Minute</key><integer>50</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>5</integer>
+            <key>Hour</key><integer>12</integer>
+            <key>Minute</key><integer>50</integer>
+        </dict>
+    </array>
+
+    <key>RunAtLoad</key><false/>
+    <key>KeepAlive</key><false/>
+
+    <!-- launchd's own stdout/stderr go here. The wrapper script tees its
+         own output into ~/Library/Logs/iav3/paper-YYYY-MM-DD.log too. -->
+    <key>StandardOutPath</key>
+    <string>/Users/hansmseraphim/Library/Logs/iav3/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/hansmseraphim/Library/Logs/iav3/launchd.err.log</string>
+
+    <!-- Working dir is set explicitly in the wrapper script too. -->
+    <key>WorkingDirectory</key>
+    <string>/Users/hansmseraphim/iav3</string>
+</dict>
+</plist>

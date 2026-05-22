@@ -1,113 +1,119 @@
-# 3-day weekly cadence runbook — AGGRESSIVE STACK (target 20%+ annualized)
+# Operations runbook — AUTOMATED 5-day cadence, aggressive stack
 
-Operational guide for running investing-analyst-v3 paper trading
-Tuesday / Wednesday / Friday near market close, with the aggressive
-configuration that targets 20%+ annualized at the cost of accepting
-30%+ drawdowns.
+The agent now runs **automatically Mon-Fri at 12:50 PM PT (3:50 PM ET)**
+via macOS launchd. You don't need to remember to run anything. Logs
+land in `~/Library/Logs/iav3/`, dashboard updates in real time.
 
-> **Honest expectation:** this configuration may hit 20-40% in a
-> bull/momentum regime (NVDA-style 2023-2024). In a regime-change
-> year (2022-style rotation, 2018-style vol spike) it may produce
-> -25% to -35% drawdowns. The walk-forward harness is set up so
-> the strategy must re-validate before any consideration of live.
+> **Honest expectation:** the aggressive stack targets 20%+ annualized.
+> Best-case outcomes (bull/momentum regime) plausibly 25-40%. Regime-
+> change years (rotation, vol spikes) plausibly -25% to -35%. The
+> walk-forward harness must re-validate before any consideration of
+> live trading; current config is paper-only.
 
-## TL;DR — what to type Tue/Wed/Fri at ~3:50 PM ET
+## Project location
 
-```bash
-cd /Users/hansmseraphim/Desktop/investing-analyst-v3
-source agent/.venv/bin/activate
-iav3 paper
-open https://dashboard.fairwinds.live
+```
+~/iav3
 ```
 
-The agent reads everything from `.env`. No flags needed.
+The project was moved from `~/Desktop/investing-analyst-v3` to `~/iav3`
+because macOS Sequoia/Sonoma sandboxes `~/Desktop` against launchd
+background jobs. The new path is sandbox-free.
+
+## TL;DR — what you do day-to-day
+
+**Nothing.** The launchd job fires automatically Mon-Fri. You just:
+
+- Glance at `https://dashboard.fairwinds.live` whenever you want
+- (Optional) `tail ~/Library/Logs/iav3/paper-$(date +%Y-%m-%d).log`
+  to see what the most recent cycle did
+
+## If you want to trigger a cycle manually (or run from terminal)
+
+```bash
+cd ~/iav3 && source agent/.venv/bin/activate && iav3 paper
+```
+
+The launchd job runs the same wrapper, so manual cycles produce
+identical behavior — just bypass the schedule.
 
 ## Locked configuration
 
 | Setting | Value | Rationale |
 |---|---|---|
-| Strategy | `vol_target_trend_aggressive` | fast=10, slow=50, target_vol=0.20 — faster trend response, higher sizing per realized-vol unit. NOT walk-forward-validated on these params; paper-trade is the validation |
-| Watchlist | AAPL, NVDA, GOOGL, MSFT, QQQ | 5-name tech-bias for max concentration in highest-momentum names. Cuts diversification to amplify favorable regimes |
-| Max position % | 20% | Up from 8% — allows 1/5 of equity in a single name, the maximum still compatible with portfolio-style risk |
-| Max daily loss | 6% | Up from 3-4% — accepts ~2σ vol days without halting trading |
-| Min cash reserve | 5% | Down from 15% — keeps capital deployed; less dry powder for opportunistic adds |
+| Strategy | `vol_target_trend_aggressive` | fast=10, slow=50, target_vol=0.20 |
+| Watchlist | AAPL, NVDA, GOOGL, MSFT, QQQ | 5-name tech-bias for concentration |
+| Max position % | 20% | 1/5 of equity per name |
+| Max daily loss | 6% | Tolerates ~2σ days |
+| Min cash reserve | 5% | Most capital deployed |
 | Options overlay | ENABLED | Bootstraps IV history from day 1 |
-| Overlay IV-rank ceiling | 50 | Up from 30 — fires more often, at less ideal IV levels |
-| Overlay sizing | 12% of equity | Up from 5% — each overlay call is a ~$12k debit on a $103k account |
-| Overlay target DTE | 60 | Down from 75 — more theta acceleration, more responsive to underlying moves |
-| Overlay target delta | 0.55 | Up from 0.50 — slightly ITM calls; more delta exposure per contract |
+| Overlay IV-rank ceiling | 50 | Fires at less ideal IV |
+| Overlay sizing | 12% of equity | ~$12k debit per overlay |
+| Overlay target DTE | 60 | More theta acceleration |
+| Overlay target delta | 0.55 | Slightly ITM calls |
 
-All settings live in `/Users/hansmseraphim/Desktop/investing-analyst-v3/.env`.
+All settings live in `~/iav3/.env`. Edit and the next cycle picks
+up the changes — no restart required.
 
 ## Schedule
 
-| Day | Time (ET) | Action |
-|---|---|---|
-| Tuesday | 3:50 PM | `iav3 paper` |
-| Wednesday | 3:50 PM | `iav3 paper` |
-| Friday | 3:50 PM | `iav3 paper` |
+| Day | Time (PT) | Time (ET) | What happens |
+|---|---|---|---|
+| Monday | 12:50 PM | 3:50 PM | Automated cycle |
+| Tuesday | 12:50 PM | 3:50 PM | Automated cycle |
+| Wednesday | 12:50 PM | 3:50 PM | Automated cycle |
+| Thursday | 12:50 PM | 3:50 PM | Automated cycle |
+| Friday | 12:50 PM | 3:50 PM | Automated cycle |
 
-Monday / Thursday / weekend: nothing. Alpaca bracket orders run
-autonomously on the stops/targets between your cycles.
+Weekends + holidays: no cycle (Alpaca's `is_market_open()` returns
+False; the agent logs and exits without acting). Bracket orders
+already on the broker fill autonomously if their levels are hit
+during market hours.
 
-## What this stack does that the disciplined plan doesn't
+## Logs
 
-1. **Concentrates** into 5 highest-momentum names — bigger gains in
-   trending regimes; bigger losses when leaders rotate
-2. **Buys faster** — fast EMA 10 vs 20 catches momentum changes ~1
-   week sooner but also chops more in sideways markets
-3. **Sizes bigger** — 20% per position (4× the conservative cap)
-   means a 50% loss on one name = 10% portfolio loss
-4. **Bleeds less cash** — 5% reserve vs 15% means more capital
-   working; also less ability to add on dips
-5. **Stretches the overlay** — IV rank up to 50 means calls aren't
-   always genuinely cheap; sizing at 12% means each is meaningful
+```bash
+# Today's cycle log (full agent stdout/stderr)
+tail -f ~/Library/Logs/iav3/paper-$(date +%Y-%m-%d).log
 
-## What I'd be watching for after week 4
+# launchd's own logs (only useful for diagnosing scheduler issues)
+tail ~/Library/Logs/iav3/launchd.out.log
+tail ~/Library/Logs/iav3/launchd.err.log
 
-After ~12 sessions (4 weeks × 3 days), pull these numbers from the
-dashboard `/health` and `/journal`:
+# All historic cycle logs
+ls -lh ~/Library/Logs/iav3/paper-*.log
+```
 
-| Metric | Within range | Concerning |
-|---|---|---|
-| Paper P&L | Within ±25% of what the strategy could plausibly produce given the regime | Persistently negative across all 5 symbols even in trending market |
-| Trade count | 5-20 entries over 12 sessions | 0 (broken signal pipeline) or > 50 (overtrading) |
-| Bracket hit rate | 20-40% of entries stopped, 30-50% targeted, rest signal-exited | All stops, no targets (vol-target may be poorly calibrated to regime) |
-| Overlay decisions | All "block_iv_history_insufficient" until ~session 60 per symbol | Overlay opens early due to wrong gate config |
-| Max paper drawdown | < 20% peak-to-trough | > 30% — pause and reassess |
+## Managing the schedule
 
-## Bail conditions
+```bash
+# Status — is the job loaded?
+launchctl list | grep com.fairwinds.iav3-paper
 
-Concrete numbers that mean STOP and reassess:
+# Trigger one cycle right now (useful for testing)
+launchctl start com.fairwinds.iav3-paper
+
+# Stop the automated schedule (manual-only mode)
+bash ~/iav3/scripts/uninstall-launchd.sh
+
+# Re-install / refresh after editing the plist
+bash ~/iav3/scripts/install-launchd.sh
+```
+
+## Bail conditions — when to pause
+
+Concrete numbers that should make you stop the automation and investigate:
 
 | Trigger | Action |
 |---|---|
-| Cumulative paper return < -25% by week 8 | Stop. Either the strategy doesn't suit current regime OR there's a bug. Run walk-forward on real paper data, not historical |
-| 3+ consecutive overlay positions lose 80%+ of premium | Disable overlay (`ENABLE_OPTIONS_OVERLAY=false`). IV-rank gate is letting through bad timing |
-| Single-day equity drop > 15% intraday | Run `iav3 paper` immediately. Manually verify positions on Alpaca dashboard. Investigate before next cycle |
-| Aggregate Sharpe over the live paper period < 0 by week 12 | Stop. Strategy doesn't work in this regime. Revert to conservative settings or sit on cash |
+| Cumulative paper return < -25% by week 8 | `uninstall-launchd.sh`; review per-trade behavior |
+| 3+ consecutive overlay positions lose 80%+ of premium | Set `ENABLE_OPTIONS_OVERLAY=false` in `.env` |
+| Single-day equity drop > 15% intraday | `launchctl start com.fairwinds.iav3-paper` to force a cycle; manually inspect open positions |
+| Aggregate paper Sharpe over 12 weeks < 0 | Stop, revert to conservative config (instructions below) |
 
-## Promotion to live (not before)
+## Reverting to disciplined defaults
 
-The aggressive walk-forward gate is loosened:
-- `oos_sharpe > 0.5` (was 0.7)
-- `max_oos_dd < 35%` (was 25%)
-- `worst_window_sharpe > -1.0` (was -0.5)
-
-To promote: pass these gates on a walk-forward run that includes the
-paper-trade period AND historical data. Plus ≥ 30 paper sessions
-where realized P&L tracks walk-forward expectation within 20%.
-
-When BOTH conditions hold:
-1. Set `TRADING_MODE=LIVE` in `.env`
-2. Restart agent
-3. Start with a fraction of intended capital (e.g. $10k of a $100k
-   account) — observe one week before scaling
-
-## Falling back to the disciplined plan
-
-If after 4-8 weeks the aggressive stack is not behaving, revert by
-editing `.env`:
+If after 4-8 weeks the aggressive stack isn't behaving, edit `~/iav3/.env`:
 
 ```
 STRATEGY=vol_target_trend
@@ -121,23 +127,21 @@ OVERLAY_TARGET_DTE=75
 OVERLAY_TARGET_DELTA=0.50
 ```
 
-These are the disciplined defaults — expected 5-12% annualized at
-sub-15% DD. Safer but lower ceiling.
+Next scheduled cycle picks up the new config. Expected return drops
+to 5-12% annualized but max DD also drops to sub-15%.
 
-## Honest framing
+## Promotion to live (not before)
 
-The expected return distribution for this aggressive stack is wide.
-The 20% target is the upper-middle of what's plausibly achievable on
-a 5-name mega-cap-tech portfolio with options overlay in a trending
-market. Hitting 20% means everything goes right: trending regime,
-overlay arms in time for cheap-IV windows, no major drawdown event.
+Aggressive walk-forward gate (loosened from defaults):
+- `oos_sharpe > 0.5`
+- `max_oos_dd < 35%`
+- `worst_window_sharpe > -1.0`
 
-The downside is symmetric. A regime change (rate shock, recession,
-sector rotation) easily produces -25% to -35% on this configuration.
-There is no "20% annualized with controlled risk" for retail; that's
-top-decile hedge fund performance and they have edges you don't.
+To promote: pass these gates on a walk-forward run that includes the
+paper-trade period AND historical data, plus ≥ 30 paper sessions
+where realized P&L tracks walk-forward expectation within 20%.
 
-What this paper experiment is genuinely measuring: how big the
-drawdown gets, how fast it recovers, and whether the strategy's
-behavior matches expectation closely enough to consider scaling.
-Treat the paper period as the most important data you'll generate.
+When BOTH conditions hold:
+1. Set `TRADING_MODE=LIVE` in `~/iav3/.env`
+2. Restart by triggering one cycle: `launchctl start com.fairwinds.iav3-paper`
+3. Start with a fraction of intended capital — observe one week before scaling
