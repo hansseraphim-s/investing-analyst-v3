@@ -1,4 +1,9 @@
 from .black_scholes import bs_delta, bs_price
+from .long_call_overlay import (
+    LongCallDecision,
+    LongCallOverlay,
+    LongCallOverlayConfig,
+)
 from .wheel import MODEL_CAVEAT, WheelResult, run_wheel_backtest
 from .wheel_live import (
     CONTRACT_LOT,
@@ -11,6 +16,9 @@ from .wheel_live import (
 
 __all__ = [
     "CONTRACT_LOT",
+    "LongCallDecision",
+    "LongCallOverlay",
+    "LongCallOverlayConfig",
     "MODEL_CAVEAT",
     "WheelDecision",
     "WheelLive",

@@ -161,7 +161,9 @@ class TestCashSecuredPut:
         assert d.action == "block_no_liquidity"
 
     def test_blocks_on_low_premium(self, mock_feed, standard_state):
-        mock_feed.chain.return_value = [make_quote(190.0, "put", bid=0.10, ask=0.20)]
+        # Tight spread (within liquidity gate) but mid below the min premium
+        # floor — triggers the premium-floor branch specifically.
+        mock_feed.chain.return_value = [make_quote(190.0, "put", bid=0.10, ask=0.11)]
         d = WheelLive(mock_feed).decide(standard_state, as_of=TODAY)
         assert d.action == "block_no_liquidity"
         assert "min premium" in d.rationale.lower()
