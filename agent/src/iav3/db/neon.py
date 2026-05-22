@@ -1,10 +1,19 @@
-"""Async Neon Postgres writer for the trade journal.
+"""Sync Neon Postgres writer for the trade journal.
 
-One connection pool per process. Writes are fire-and-forget from the
-engine's perspective (failures are logged but do not abort a cycle —
-the journal is observability, not a circuit breaker).
+Replaces v2's local SQLite journal as the source of truth for the
+dashboard. The agent writes here; the Next.js dashboard reads via
+@neondatabase/serverless (JS, async, separate concern). Schema source
+of truth: shared/schema.sql.
 
-Read side is the Next.js dashboard, which connects via its own pool.
+Why sync: the engine is sync, runs once per cycle, makes ~tens of
+journal writes per cycle. There's no benefit to async; sync psycopg
+with a connection pool is the simpler shape that integrates cleanly
+into the existing engine.
+
+Failure mode: ALL writes are wrapped by the engine in try/except so a
+Neon outage degrades observability but never aborts a trading cycle.
+The SQLite local journal (portfolio.py) remains the primary source for
+risk-layer reads (trades_today) — Neon is for the dashboard.
 """
 
 from __future__ import annotations
@@ -13,14 +22,14 @@ import json
 import logging
 import os
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 import psycopg
-from psycopg_pool import AsyncConnectionPool
+from psycopg_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +45,7 @@ def _serializable(value: Any) -> Any:
 
 
 class NeonJournal:
-    """Async writer for the journal tables. Construct once per process."""
+    """Sync writer for the journal tables. Construct once per process."""
 
     def __init__(self, dsn: str | None = None, *, min_size: int = 1, max_size: int = 4) -> None:
         dsn = dsn or os.environ.get("NEON_DATABASE_URL")
@@ -45,26 +54,65 @@ class NeonJournal:
                 "NEON_DATABASE_URL is not set. Configure it in .env "
                 "(see .env.example) or pass dsn= explicitly."
             )
-        self._pool = AsyncConnectionPool(dsn, min_size=min_size, max_size=max_size, open=False)
+        self._pool = ConnectionPool(dsn, min_size=min_size, max_size=max_size, open=False)
         self._opened = False
 
-    async def open(self) -> None:
+    def open(self) -> None:
         if not self._opened:
-            await self._pool.open()
+            self._pool.open()
             self._opened = True
 
-    async def close(self) -> None:
+    def close(self) -> None:
         if self._opened:
-            await self._pool.close()
+            self._pool.close()
             self._opened = False
 
-    @asynccontextmanager
-    async def _conn(self):
-        await self.open()
-        async with self._pool.connection() as conn:
+    def __enter__(self) -> NeonJournal:
+        self.open()
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        self.close()
+
+    @contextmanager
+    def _conn(self):
+        self.open()
+        with self._pool.connection() as conn:
             yield conn
 
-    async def open_session(
+    # ------------------------------------------------------------------
+    # Health check
+    # ------------------------------------------------------------------
+
+    def ping(self) -> bool:
+        try:
+            with self._conn() as conn, conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                row = cur.fetchone()
+                return bool(row and row[0] == 1)
+        except (psycopg.OperationalError, OSError) as e:
+            logger.error("Neon ping failed: %s", e)
+            return False
+
+    def schema_applied(self) -> bool:
+        """True when shared/schema.sql has been applied (sessions table exists)."""
+        try:
+            with self._conn() as conn, conn.cursor() as cur:
+                cur.execute(
+                    "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_name = 'sessions')"
+                )
+                row = cur.fetchone()
+                return bool(row and row[0])
+        except psycopg.OperationalError as e:
+            logger.error("schema_applied check failed: %s", e)
+            return False
+
+    # ------------------------------------------------------------------
+    # Sessions
+    # ------------------------------------------------------------------
+
+    def open_session(
         self,
         *,
         trading_mode: str,
@@ -73,18 +121,16 @@ class NeonJournal:
         agent_version: str,
         git_sha: str | None = None,
     ) -> int:
-        sql = """
-            INSERT INTO sessions (trading_mode, strategy, equity_start, agent_version, git_sha)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id
-        """
-        async with self._conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, (trading_mode, strategy, equity_start, agent_version, git_sha))
-                row = await cur.fetchone()
-                return int(row[0])
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO sessions (trading_mode, strategy, equity_start, agent_version, git_sha) "
+                "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                (trading_mode, strategy, equity_start, agent_version, git_sha),
+            )
+            row = cur.fetchone()
+            return int(row[0])
 
-    async def close_session(
+    def close_session(
         self,
         session_id: int,
         *,
@@ -94,21 +140,18 @@ class NeonJournal:
         summary: str,
         advisor_review: str | None = None,
     ) -> None:
-        sql = """
-            UPDATE sessions
-            SET ended_at = now(),
-                equity_end = %s,
-                cash_end = %s,
-                day_pnl_pct = %s,
-                summary = %s,
-                advisor_review = %s
-            WHERE id = %s
-        """
-        async with self._conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, (equity_end, cash_end, day_pnl_pct, summary, advisor_review, session_id))
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "UPDATE sessions SET ended_at = now(), equity_end = %s, cash_end = %s, "
+                "day_pnl_pct = %s, summary = %s, advisor_review = %s WHERE id = %s",
+                (equity_end, cash_end, day_pnl_pct, summary, advisor_review, session_id),
+            )
 
-    async def record_order(
+    # ------------------------------------------------------------------
+    # Orders + signals + equity + greeks
+    # ------------------------------------------------------------------
+
+    def record_order(
         self,
         *,
         session_id: int | None,
@@ -127,24 +170,18 @@ class NeonJournal:
         broker_order_id: str | None = None,
         advisor_rationale: str | None = None,
     ) -> int:
-        sql = """
-            INSERT INTO orders
-                (session_id, symbol, asset_class, option_type, strike, expiry,
-                 side, qty, price, stop_price, take_profit, status, reason,
-                 broker_order_id, advisor_rationale)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            RETURNING id
-        """
-        params = (session_id, symbol, asset_class, option_type, strike, expiry,
-                  side, qty, price, stop_price, take_profit, status, reason,
-                  broker_order_id, advisor_rationale)
-        async with self._conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, params)
-                row = await cur.fetchone()
-                return int(row[0])
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO orders (session_id, symbol, asset_class, option_type, strike, expiry, "
+                "side, qty, price, stop_price, take_profit, status, reason, broker_order_id, "
+                "advisor_rationale) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+                (session_id, symbol, asset_class, option_type, strike, expiry, side, qty,
+                 price, stop_price, take_profit, status, reason, broker_order_id, advisor_rationale),
+            )
+            row = cur.fetchone()
+            return int(row[0])
 
-    async def record_signal(
+    def record_signal(
         self,
         *,
         session_id: int,
@@ -158,19 +195,17 @@ class NeonJournal:
         target_weight: float | None = None,
         extra: dict[str, Any] | None = None,
     ) -> None:
-        sql = """
-            INSERT INTO signals
-                (session_id, symbol, strategy, target, target_weight, price,
-                 atr, realized_vol, iv_rank, extra_features)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """
         extra_json = json.dumps(extra, default=_serializable) if extra else None
-        async with self._conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, (session_id, symbol, strategy, target, target_weight,
-                                        price, atr, realized_vol, iv_rank, extra_json))
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO signals (session_id, symbol, strategy, target, target_weight, "
+                "price, atr, realized_vol, iv_rank, extra_features) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (session_id, symbol, strategy, target, target_weight, price, atr, realized_vol,
+                 iv_rank, extra_json),
+            )
 
-    async def record_equity_point(
+    def record_equity_point(
         self,
         *,
         session_id: int,
@@ -179,15 +214,37 @@ class NeonJournal:
         benchmark_value: float | None = None,
         drawdown_pct: float | None = None,
     ) -> None:
-        sql = """
-            INSERT INTO equity_curve (session_id, equity, cash, benchmark_value, drawdown_pct)
-            VALUES (%s, %s, %s, %s, %s)
-        """
-        async with self._conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, (session_id, equity, cash, benchmark_value, drawdown_pct))
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO equity_curve (session_id, equity, cash, benchmark_value, drawdown_pct) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (session_id, equity, cash, benchmark_value, drawdown_pct),
+            )
 
-    async def record_greeks(
+    def record_position_snapshot(
+        self,
+        *,
+        session_id: int,
+        symbol: str,
+        asset_class: str,
+        qty: float,
+        market_value: float,
+        avg_entry: float | None = None,
+        unrealized_pl: float | None = None,
+        option_type: str | None = None,
+        strike: float | None = None,
+        expiry: date | None = None,
+    ) -> None:
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO positions (session_id, symbol, asset_class, qty, avg_entry, "
+                "market_value, unrealized_pl, option_type, strike, expiry) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (session_id, symbol, asset_class, qty, avg_entry, market_value, unrealized_pl,
+                 option_type, strike, expiry),
+            )
+
+    def record_greeks(
         self,
         *,
         session_id: int,
@@ -199,18 +256,15 @@ class NeonJournal:
         cash_pct: float,
         rho: float | None = None,
     ) -> None:
-        sql = """
-            INSERT INTO greeks_snapshot
-                (session_id, portfolio_delta, portfolio_gamma, portfolio_vega,
-                 portfolio_theta, portfolio_rho, notional_exposure, cash_pct)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-        """
-        async with self._conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, (session_id, delta, gamma, vega, theta, rho,
-                                        notional_exposure, cash_pct))
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO greeks_snapshot (session_id, portfolio_delta, portfolio_gamma, "
+                "portfolio_vega, portfolio_theta, portfolio_rho, notional_exposure, cash_pct) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                (session_id, delta, gamma, vega, theta, rho, notional_exposure, cash_pct),
+            )
 
-    async def record_walk_forward(
+    def record_walk_forward(
         self,
         *,
         run_id: uuid.UUID,
@@ -227,19 +281,17 @@ class NeonJournal:
         oos_max_dd_pct: float | None,
         promoted: bool = False,
     ) -> None:
-        sql = """
-            INSERT INTO walk_forward_runs
-                (run_id, strategy, symbol, is_start, is_end, oos_start, oos_end,
-                 params, is_sharpe, oos_sharpe, oos_return_pct, oos_max_dd_pct, promoted)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """
-        async with self._conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, (str(run_id), strategy, symbol, is_start, is_end,
-                                        oos_start, oos_end, json.dumps(params, default=_serializable),
-                                        is_sharpe, oos_sharpe, oos_return_pct, oos_max_dd_pct, promoted))
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO walk_forward_runs (run_id, strategy, symbol, is_start, is_end, "
+                "oos_start, oos_end, params, is_sharpe, oos_sharpe, oos_return_pct, oos_max_dd_pct, "
+                "promoted) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (str(run_id), strategy, symbol, is_start, is_end, oos_start, oos_end,
+                 json.dumps(params, default=_serializable), is_sharpe, oos_sharpe,
+                 oos_return_pct, oos_max_dd_pct, promoted),
+            )
 
-    async def record_kill_switch(
+    def record_kill_switch(
         self,
         *,
         session_id: int | None,
@@ -247,26 +299,13 @@ class NeonJournal:
         detail: str,
         positions_at_trigger: list[dict[str, Any]] | None = None,
     ) -> None:
-        sql = """
-            INSERT INTO kill_switch_events
-                (session_id, trigger, detail, positions_at_trigger)
-            VALUES (%s, %s, %s, %s)
-        """
         positions_json = (
             json.dumps(positions_at_trigger, default=_serializable)
             if positions_at_trigger is not None else None
         )
-        async with self._conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, (session_id, trigger, detail, positions_json))
-
-    async def ping(self) -> bool:
-        try:
-            async with self._conn() as conn:
-                async with conn.cursor() as cur:
-                    await cur.execute("SELECT 1")
-                    row = await cur.fetchone()
-                    return bool(row and row[0] == 1)
-        except (psycopg.OperationalError, OSError) as e:
-            logger.error("Neon ping failed: %s", e)
-            return False
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO kill_switch_events (session_id, trigger, detail, positions_at_trigger) "
+                "VALUES (%s, %s, %s, %s)",
+                (session_id, trigger, detail, positions_json),
+            )
