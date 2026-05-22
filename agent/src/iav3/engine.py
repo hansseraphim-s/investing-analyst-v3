@@ -318,9 +318,17 @@ def run_cycle(settings: Settings, *, verbose: bool = True) -> str:
         if settings.enable_options_overlay and target == 1:
             try:
                 from .data import AlpacaOptionsFeed
-                from .options import LongCallOverlay
+                from .options import LongCallOverlay, LongCallOverlayConfig
 
-                overlay = LongCallOverlay(AlpacaOptionsFeed())
+                # Overlay config from env so the aggressive stack can tune
+                # IV-rank ceiling + sizing without code changes
+                overlay_cfg = LongCallOverlayConfig(
+                    iv_rank_max=float(os.environ.get("OVERLAY_IV_RANK_MAX", "30")),
+                    overlay_pct_of_equity=float(os.environ.get("OVERLAY_PCT_OF_EQUITY", "0.05")),
+                    target_dte=int(os.environ.get("OVERLAY_TARGET_DTE", "75")),
+                    target_delta=float(os.environ.get("OVERLAY_TARGET_DELTA", "0.50")),
+                )
+                overlay = LongCallOverlay(AlpacaOptionsFeed(), config=overlay_cfg)
                 oc_decision = overlay.decide(
                     underlying=symbol, spot=price, trend_on=True,
                     available_cash=pv.cash, equity=pv.equity,

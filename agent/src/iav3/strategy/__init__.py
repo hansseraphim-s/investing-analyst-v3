@@ -2,11 +2,13 @@ from .base import Strategy
 from .mean_reversion import MeanReversionStrategy
 from .momentum import MomentumStrategy
 from .vol_target_trend import VolTargetTrendStrategy
+from .vol_target_trend_aggressive import VolTargetTrendAggressiveStrategy
 
 _REGISTRY: dict[str, type[Strategy]] = {
     MomentumStrategy.name: MomentumStrategy,
     MeanReversionStrategy.name: MeanReversionStrategy,
     VolTargetTrendStrategy.name: VolTargetTrendStrategy,
+    VolTargetTrendAggressiveStrategy.name: VolTargetTrendAggressiveStrategy,
 }
 
 
@@ -28,6 +30,7 @@ __all__ = [
     "MomentumStrategy",
     "MeanReversionStrategy",
     "VolTargetTrendStrategy",
+    "VolTargetTrendAggressiveStrategy",
     "get_strategy",
     "available_strategies",
 ]

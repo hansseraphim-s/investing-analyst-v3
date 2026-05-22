@@ -5,6 +5,7 @@ import pytest
 from iav3.strategy import (
     MeanReversionStrategy,
     MomentumStrategy,
+    VolTargetTrendAggressiveStrategy,
     VolTargetTrendStrategy,
     available_strategies,
     get_strategy,
@@ -27,7 +28,12 @@ def _bars(close: np.ndarray) -> pd.DataFrame:
 
 @pytest.mark.parametrize(
     "strat",
-    [MomentumStrategy(), MeanReversionStrategy(), VolTargetTrendStrategy()],
+    [
+        MomentumStrategy(),
+        MeanReversionStrategy(),
+        VolTargetTrendStrategy(),
+        VolTargetTrendAggressiveStrategy(),
+    ],
 )
 def test_contract_target_and_atr(strat):
     rng = np.random.default_rng(7)
@@ -42,10 +48,21 @@ def test_contract_target_and_atr(strat):
 
 def test_registry_roundtrip():
     assert set(available_strategies()) == {
-        "momentum", "mean_reversion", "vol_target_trend"
+        "momentum",
+        "mean_reversion",
+        "vol_target_trend",
+        "vol_target_trend_aggressive",
     }
     assert isinstance(get_strategy("MOMENTUM"), MomentumStrategy)
     assert isinstance(get_strategy("vol_target_trend"), VolTargetTrendStrategy)
+    assert isinstance(
+        get_strategy("vol_target_trend_aggressive"), VolTargetTrendAggressiveStrategy
+    )
+    aggressive = get_strategy("vol_target_trend_aggressive")
+    # Confirm the aggressive params actually took effect
+    assert aggressive.fast == 10
+    assert aggressive.slow == 50
+    assert aggressive.target_vol == 0.20
     with pytest.raises(ValueError):
         get_strategy("does_not_exist")
 
