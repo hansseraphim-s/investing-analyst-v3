@@ -189,6 +189,58 @@ def _slice_window(df: pd.DataFrame, start: date, end: date) -> pd.DataFrame:
     return df.loc[pd.Timestamp(start) : pd.Timestamp(end)]
 
 
+def _slice_with_warmup(
+    df: pd.DataFrame,
+    start: date,
+    end: date,
+    *,
+    warmup_bars: int,
+) -> pd.DataFrame:
+    """Slice [start, end] PLUS `warmup_bars` of leading history.
+
+    Strategies with a long indicator lookback (e.g. vol_target_trend's
+    200-bar regime SMA) can't generate signals on a fresh slice unless
+    they see at least `warmup_bars` of prior history. Without this the
+    OOS window has no signals to act on and OOS metrics come out as
+    exactly zero — a tooling bug, not a strategy verdict.
+    """
+    if df.empty or warmup_bars <= 0:
+        return _slice_window(df, start, end)
+    idx = df.index
+    start_loc = int(idx.searchsorted(pd.Timestamp(start)))
+    warmup_loc = max(start_loc - warmup_bars, 0)
+    warmup_start = idx[warmup_loc]
+    return df.loc[warmup_start : pd.Timestamp(end)]
+
+
+def _oos_metrics_only(
+    backtest_result,
+    oos_start: date,
+    oos_end: date,
+):
+    """Recompute metrics on the OOS portion only.
+
+    The OOS backtest runs over (warmup + OOS) so the strategy can warm
+    up its indicators. But Sharpe / max-DD / return must be reported
+    over JUST the OOS portion — including the flat warmup bars would
+    inflate Sharpe (zero-return days lower the stddev) and bury any
+    OOS-window drawdown.
+    """
+    from .metrics import compute_metrics
+
+    eq = backtest_result.equity
+    oos_eq = eq.loc[pd.Timestamp(oos_start) : pd.Timestamp(oos_end)]
+    if len(oos_eq) < 2:
+        # Insufficient OOS bars for metrics; signal degenerate
+        return None
+    # Trades that happened during OOS only
+    oos_trades = [
+        t for t in backtest_result.trades
+        if pd.Timestamp(t.get("entry_time", oos_start)) >= pd.Timestamp(oos_start)
+    ]
+    return compute_metrics(oos_eq, oos_trades, exposure_fraction=1.0)
+
+
 def walk_forward(
     *,
     strategy_factory: Callable[..., Strategy],
@@ -218,10 +270,20 @@ def walk_forward(
     strategy_name = strategy_factory().name
     results: list[WalkForwardWindowResult] = []
 
+    # Probe the strategy's warmup attribute so the OOS slice can include
+    # enough leading history for indicators to be valid at OOS start.
+    try:
+        warmup_bars = int(getattr(strategy_factory(), "warmup", 0))
+    except Exception:
+        warmup_bars = 0
+
     for symbol, df in data.items():
         for window in windows:
             is_df = _slice_window(df, window.is_start, window.is_end)
-            oos_df = _slice_window(df, window.oos_start, window.oos_end)
+            # OOS slice includes warmup buffer; metrics are computed on OOS portion only.
+            oos_df = _slice_with_warmup(
+                df, window.oos_start, window.oos_end, warmup_bars=warmup_bars,
+            )
             if len(is_df) < min_is_bars or len(oos_df) < min_oos_bars:
                 logger.info(
                     "skip (%s, IS=%s..%s, OOS=%s..%s): is=%d, oos=%d",
@@ -257,14 +319,19 @@ def walk_forward(
                 logger.warning("OOS backtest failed (%s, %s): %s", symbol, window.oos_start, e)
                 continue
 
+            # Recompute OOS metrics on the OOS portion ONLY (exclude warmup bars).
+            oos_metrics = _oos_metrics_only(oos_res, window.oos_start, window.oos_end)
+            if oos_metrics is None:
+                continue
+
             results.append(WalkForwardWindowResult(
                 symbol=symbol,
                 window=window,
                 best_params=best_params,
                 is_sharpe=best_is_sharpe,
-                oos_sharpe=oos_res.metrics.sharpe,
-                oos_return_pct=oos_res.metrics.total_return_pct,
-                oos_max_dd_pct=oos_res.metrics.max_drawdown_pct,
+                oos_sharpe=oos_metrics.sharpe,
+                oos_return_pct=oos_metrics.total_return_pct,
+                oos_max_dd_pct=oos_metrics.max_drawdown_pct,
             ))
 
     agg_sharpe, agg_max_dd, worst_sharpe, promo, rationale = aggregate(results, gates=gates)

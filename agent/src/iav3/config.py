@@ -72,9 +72,14 @@ def load_settings() -> Settings:
     mode = os.getenv("TRADING_MODE", "PAPER").upper()
     if mode not in {"PAPER", "LIVE"}:
         raise ValueError(f"TRADING_MODE must be PAPER or LIVE; got {mode!r}")
+    # Accept both ALPACA_SECRET_KEY (v2 convention) and ALPACA_API_SECRET
+    # (Alpaca's own docs use the latter). My .env.example uses _API_SECRET
+    # but config used to only read _SECRET_KEY, so paper mode silently
+    # routed to the in-process simulator instead of Alpaca paper.
+    secret = os.getenv("ALPACA_SECRET_KEY") or os.getenv("ALPACA_API_SECRET", "")
     return Settings(
         alpaca_api_key=os.getenv("ALPACA_API_KEY", ""),
-        alpaca_secret_key=os.getenv("ALPACA_SECRET_KEY", ""),
+        alpaca_secret_key=secret,
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
         trading_mode=mode,
         watchlist=_split(os.getenv("WATCHLIST", "AAPL,MSFT,SPY")),
