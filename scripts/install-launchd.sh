@@ -46,7 +46,7 @@ else
 fi
 
 echo ""
-echo "Schedule: Monday-Friday at 12:50 PM Pacific (3:50 PM Eastern)."
+echo "Schedule: Monday-Friday at 12:30 PM Pacific (3:30 PM Eastern)."
 echo "Logs:     ~/Library/Logs/iav3/paper-YYYY-MM-DD.log"
 echo ""
 echo "Useful commands:"

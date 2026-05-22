@@ -1,6 +1,6 @@
 # Operations runbook — AUTOMATED 5-day cadence, aggressive stack
 
-The agent now runs **automatically Mon-Fri at 12:50 PM PT (3:50 PM ET)**
+The agent now runs **automatically Mon-Fri at 12:30 PM PT (3:30 PM ET)**
 via macOS launchd. You don't need to remember to run anything. Logs
 land in `~/Library/Logs/iav3/`, dashboard updates in real time.
 
@@ -42,8 +42,8 @@ identical behavior — just bypass the schedule.
 | Setting | Value | Rationale |
 |---|---|---|
 | Strategy | `vol_target_trend_aggressive` | fast=10, slow=50, target_vol=0.20 |
-| Watchlist | AAPL, NVDA, GOOGL, MSFT, QQQ | 5-name tech-bias for concentration |
-| Max position % | 20% | 1/5 of equity per name |
+| Watchlist | **S&P 100 (100 large-caps, all $20B+)** | Wide net for more signals, tight options spreads, all walk-forward-eligible |
+| Max position % | 20% | 1/5 of equity per name (caps at ~5 concurrent positions) |
 | Max daily loss | 6% | Tolerates ~2σ days |
 | Min cash reserve | 5% | Most capital deployed |
 | Options overlay | ENABLED | Bootstraps IV history from day 1 |
@@ -52,6 +52,14 @@ identical behavior — just bypass the schedule.
 | Overlay target DTE | 60 | More theta acceleration |
 | Overlay target delta | 0.55 | Slightly ITM calls |
 
+### Cycle timing (benchmarked, not estimated)
+
+- **Data fetch + indicator computation:** 0.27s per symbol × 100 = **~27 seconds**
+- **+ Alpaca chain queries** (only when overlay fires, ~30 symbols/cycle): ~45 seconds
+- **+ Bracket order placement** (only on new entries, ~5-15/cycle): ~15 seconds
+- **+ Neon writes:** ~5 seconds
+- **Total cycle wall-clock: ~1.5-3 minutes** (well under the 30-min buffer before close)
+
 All settings live in `~/iav3/.env`. Edit and the next cycle picks
 up the changes — no restart required.
 
@@ -59,11 +67,11 @@ up the changes — no restart required.
 
 | Day | Time (PT) | Time (ET) | What happens |
 |---|---|---|---|
-| Monday | 12:50 PM | 3:50 PM | Automated cycle |
-| Tuesday | 12:50 PM | 3:50 PM | Automated cycle |
-| Wednesday | 12:50 PM | 3:50 PM | Automated cycle |
-| Thursday | 12:50 PM | 3:50 PM | Automated cycle |
-| Friday | 12:50 PM | 3:50 PM | Automated cycle |
+| Monday | 12:30 PM | 3:30 PM | Automated cycle |
+| Tuesday | 12:30 PM | 3:30 PM | Automated cycle |
+| Wednesday | 12:30 PM | 3:30 PM | Automated cycle |
+| Thursday | 12:30 PM | 3:30 PM | Automated cycle |
+| Friday | 12:30 PM | 3:30 PM | Automated cycle |
 
 Weekends + holidays: no cycle (Alpaca's `is_market_open()` returns
 False; the agent logs and exits without acting). Bracket orders
