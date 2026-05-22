@@ -96,3 +96,28 @@ def recent_sessions(limit: int = 10, db_path: str = JOURNAL_DB) -> list[dict]:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def portfolio_returns_last_n(n: int = 252, db_path: str = JOURNAL_DB) -> list[float]:
+    """Last `n` daily return fractions from the sessions journal.
+
+    Reads day_pnl_pct (stored as percentages, e.g. -2.5 for -2.5%) from
+    the most recent `n` sessions and returns them as FRACTIONS (e.g.
+    -0.025). Order is chronological (oldest first) so callers can feed
+    directly into CVaR routines that expect time-ordered data.
+
+    Returns [] when the journal is empty or hasn't been initialized.
+    """
+    try:
+        conn = sqlite3.connect(db_path)
+        rows = conn.execute(
+            "SELECT day_pnl_pct FROM sessions ORDER BY id DESC LIMIT ?",
+            (n,),
+        ).fetchall()
+        conn.close()
+    except sqlite3.OperationalError:
+        return []
+    # Newest-first from SQL; reverse to chronological order
+    pcts = [float(r[0]) for r in rows if r[0] is not None]
+    pcts.reverse()
+    return [p / 100.0 for p in pcts]

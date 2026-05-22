@@ -23,12 +23,84 @@ from datetime import datetime, timedelta, timezone
 
 from rich.console import Console
 
+import re
+from dataclasses import dataclass
+
 from .broker import PaperBroker, get_broker
+from .broker.base import BrokerPosition
 from .config import Settings
 from .data import YFinanceData
-from .portfolio import init_journal, record_order, record_session, trades_today
+from .greeks.aggregator import aggregate_greeks
+from .portfolio import (
+    init_journal,
+    portfolio_returns_last_n,
+    record_order,
+    record_session,
+    trades_today,
+)
 from .risk import PortfolioView, Position, pre_trade_check
 from .strategy import get_strategy
+
+# OCC option-symbol pattern; used to classify broker positions for Greeks aggregation.
+_OCC_PATTERN = re.compile(r"^[A-Z]+\d{6}[CP]\d{8}$")
+
+
+@dataclass(frozen=True)
+class _GreeksPosition:
+    """Greeks-aggregator-compatible view of a broker position.
+
+    The broker layer returns BrokerPosition (symbol, qty, prices) without
+    distinguishing equity vs option. This adapter classifies by OCC
+    symbol shape and exposes the fields aggregate_greeks expects.
+    """
+    symbol: str
+    asset_class: str
+    qty: float
+    market_value: float
+
+
+def _to_greeks_positions(broker_positions) -> list[_GreeksPosition]:
+    out = []
+    for p in broker_positions:
+        is_option = bool(_OCC_PATTERN.match(p.symbol))
+        out.append(_GreeksPosition(
+            symbol=p.symbol,
+            asset_class="option" if is_option else "equity",
+            qty=float(p.qty),
+            market_value=float(p.market_value),
+        ))
+    return out
+
+
+def _projected_greeks(
+    broker,
+    *,
+    new_symbol: str,
+    new_qty: int,
+    new_price: float,
+    equity: float,
+    cash: float,
+):
+    """Aggregate current portfolio Greeks plus a proposed new equity BUY.
+
+    For equity-only books this is essentially `current_delta + new_qty`.
+    When options join the book (phase 3.3 wiring), the option_quotes dict
+    needs to be populated from the AlpacaOptionsFeed; for now it's empty
+    and option positions contribute zero Greeks (but still count notional).
+    """
+    positions = _to_greeks_positions(broker.get_positions())
+    positions.append(_GreeksPosition(
+        symbol=new_symbol,
+        asset_class="option" if bool(_OCC_PATTERN.match(new_symbol)) else "equity",
+        qty=float(new_qty),
+        market_value=float(new_qty) * float(new_price),
+    ))
+    return aggregate_greeks(
+        positions=positions,
+        option_quotes={},
+        equity=equity,
+        cash=max(cash - new_qty * new_price, 0.0),
+    )
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -184,7 +256,23 @@ def run_cycle(settings: Settings, *, verbose: bool = True) -> str:
                 continue
             stop = price - settings.risk.atr_stop_mult * atr_val
             take = price + settings.risk.atr_target_mult * atr_val
-            decision = pre_trade_check("BUY", symbol, qty, price, pv, settings.risk)
+            # Phase 2/3 gates: CVaR (regime-adaptive daily-loss) + portfolio Greeks.
+            # Equity-only book today, so option_quotes is empty inside the projected
+            # Greeks aggregation; when wheel_live / long_call_overlay actually place
+            # option orders, the projection here will need to include the new option
+            # too — but for the equity BUY path we're in right now, this is correct.
+            returns_history = portfolio_returns_last_n(252)
+            projected_greeks = _projected_greeks(
+                broker,
+                new_symbol=symbol, new_qty=qty, new_price=price,
+                equity=pv.equity, cash=pv.cash,
+            )
+            decision = pre_trade_check(
+                "BUY", symbol, qty, price, pv, settings.risk,
+                returns_history=returns_history,
+                projected_greeks=projected_greeks,
+                greeks_limits=settings.risk.greeks_limits(),
+            )
             if not decision.approved:
                 log(f"  [yellow]BLOCK[/yellow] {symbol}: {decision.check} — {decision.reason}")
                 record_order(symbol, "BUY", qty, price, stop, take,
@@ -219,6 +307,47 @@ def run_cycle(settings: Settings, *, verbose: bool = True) -> str:
         else:
             log(f"  HOLD {symbol} (target={target}, "
                 f"{'in position' if symbol in held else 'flat'})")
+
+        # ---- options overlay (phase 3.3, log-only first run) ---------------
+        # When ENABLE_OPTIONS_OVERLAY=true AND the trend filter is ON for this
+        # symbol, consult LongCallOverlay. For this iteration the decision is
+        # LOGGED only — order placement comes in a follow-up commit that wires
+        # broker.submit_option_order. This lets us see what the overlay would
+        # do without actually trading options yet.
+        if settings.enable_options_overlay and target == 1:
+            try:
+                from .data import AlpacaOptionsFeed
+                from .options import LongCallOverlay
+
+                overlay = LongCallOverlay(AlpacaOptionsFeed())
+                oc_decision = overlay.decide(
+                    underlying=symbol, spot=price, trend_on=True,
+                    available_cash=pv.cash, equity=pv.equity,
+                )
+                if oc_decision.is_opening:
+                    log(f"  [cyan]OVERLAY[/cyan] {symbol}: would buy "
+                        f"{oc_decision.contracts}x calls — {oc_decision.rationale}")
+                    if neon and session_id is not None:
+                        _safe_neon(
+                            lambda r=oc_decision.rationale: neon.record_order(
+                                session_id=session_id,
+                                symbol=symbol, asset_class="option", side="BUY",
+                                option_type="call",
+                                strike=oc_decision.contract.strike,
+                                expiry=oc_decision.contract.expiry,
+                                qty=oc_decision.contracts,
+                                price=oc_decision.quote.mid,
+                                status="submitted", reason="overlay_would_open",
+                                advisor_rationale=r,
+                            ),
+                            log,
+                            f"overlay_log({symbol})",
+                        )
+                elif oc_decision.is_block:
+                    log(f"  [dim]overlay {symbol}: {oc_decision.action} — "
+                        f"{oc_decision.rationale}[/dim]")
+            except Exception as e:
+                log(f"  [yellow]overlay({symbol}) failed: {e}[/yellow]")
 
     # Paper broker: evaluate brackets against the latest prices.
     if isinstance(broker, PaperBroker) and latest_prices:

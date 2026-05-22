@@ -33,6 +33,13 @@ class RiskConfig:
     prohibited_symbols: tuple[str, ...] = (
         "UVXY", "SQQQ", "SPXS", "TVIX", "VIXY", "FAZ", "TQQQ", "SOXL", "SOXS",
     )
+    # ---- Portfolio-level Greeks caps (consumed when options orders are involved) -------
+    # max_portfolio_delta is in SHARE-EQUIVALENTS, NOT dollars (e.g. 1500 = up to 15
+    # standard-lot equivalents of net long/short exposure across the book).
+    max_portfolio_delta: float = 1500.0
+    max_portfolio_vega: float = 500.0       # $/1% IV move (absolute value cap)
+    min_portfolio_theta: float = -100.0     # most-negative theta/day allowed
+    max_portfolio_notional_pct: float = 1.5 # 150% of equity (room for defined-risk leverage)
 
     def __post_init__(self) -> None:
         for name in ("max_position_pct", "max_daily_loss_pct", "min_cash_reserve_pct"):
@@ -41,6 +48,16 @@ class RiskConfig:
                 raise ValueError(f"RiskConfig.{name} must be in (0, 1); got {v}")
         if self.atr_target_mult <= self.atr_stop_mult:
             raise ValueError("atr_target_mult must exceed atr_stop_mult (need R:R > 1)")
+
+    def greeks_limits(self):
+        """Lazy import to avoid a hard dependency in config.py."""
+        from .greeks.aggregator import GreeksLimits
+        return GreeksLimits(
+            max_delta=self.max_portfolio_delta,
+            max_vega=self.max_portfolio_vega,
+            min_theta=self.min_portfolio_theta,
+            max_notional_exposure_pct=self.max_portfolio_notional_pct,
+        )
 
 
 @dataclass(frozen=True)
@@ -53,6 +70,7 @@ class Settings:
     strategy: str = "momentum"
     cycle_interval_minutes: int = 30
     enable_advisor: bool = False
+    enable_options_overlay: bool = False     # consult LongCallOverlay per symbol when trend ON
     risk: RiskConfig = field(default_factory=RiskConfig)
 
     @property
@@ -77,6 +95,17 @@ def load_settings() -> Settings:
     # but config used to only read _SECRET_KEY, so paper mode silently
     # routed to the in-process simulator instead of Alpaca paper.
     secret = os.getenv("ALPACA_SECRET_KEY") or os.getenv("ALPACA_API_SECRET", "")
+    risk = RiskConfig(
+        max_position_pct=float(os.getenv("RISK_MAX_POSITION_PCT", "0.08")),
+        max_daily_loss_pct=float(os.getenv("RISK_MAX_DAILY_LOSS_PCT", "0.03")),
+        max_trades_per_day=int(os.getenv("RISK_MAX_TRADES_PER_DAY", "20")),
+        max_order_value=float(os.getenv("RISK_MAX_ORDER_VALUE", "5000")),
+        min_cash_reserve_pct=float(os.getenv("RISK_MIN_CASH_RESERVE_PCT", "0.15")),
+        max_portfolio_delta=float(os.getenv("RISK_MAX_PORTFOLIO_DELTA", "1500")),
+        max_portfolio_vega=float(os.getenv("RISK_MAX_PORTFOLIO_VEGA", "500")),
+        min_portfolio_theta=float(os.getenv("RISK_MIN_PORTFOLIO_THETA", "-100")),
+        max_portfolio_notional_pct=float(os.getenv("RISK_MAX_PORTFOLIO_NOTIONAL_PCT", "1.5")),
+    )
     return Settings(
         alpaca_api_key=os.getenv("ALPACA_API_KEY", ""),
         alpaca_secret_key=secret,
@@ -86,4 +115,6 @@ def load_settings() -> Settings:
         strategy=os.getenv("STRATEGY", "momentum").strip().lower(),
         cycle_interval_minutes=int(os.getenv("CYCLE_INTERVAL_MINUTES", "30")),
         enable_advisor=os.getenv("ENABLE_ADVISOR", "false").strip().lower() == "true",
+        enable_options_overlay=os.getenv("ENABLE_OPTIONS_OVERLAY", "false").strip().lower() == "true",
+        risk=risk,
     )
