@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Fair Winds Quantitative — Scope of Work</title>
+<style>
+  @page {
+    size: letter;
+    margin: 0.5in 0.6in;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #0f172a;
+    font-size: 9.5pt;
+    line-height: 1.35;
+    background: #fff;
+  }
+  .page {
+    max-width: 7.5in;
+    margin: 0 auto;
+    padding: 0;
+  }
+  header {
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 10pt;
+    margin-bottom: 12pt;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .brand {
+    font-size: 14pt;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #0f172a;
+  }
+  .sub {
+    font-size: 10pt;
+    color: #475569;
+    margin-top: 2pt;
+    font-weight: 500;
+  }
+  .contact {
+    text-align: right;
+    font-size: 8.5pt;
+    color: #475569;
+    line-height: 1.35;
+  }
+  .contact strong { color: #0f172a; }
+  h2 {
+    font-size: 10pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #0f172a;
+    margin: 12pt 0 5pt 0;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 2pt;
+  }
+  p { margin: 0 0 6pt 0; }
+  .tagline {
+    font-style: italic;
+    color: #334155;
+    font-size: 10pt;
+    margin-bottom: 10pt;
+  }
+  ul {
+    margin: 4pt 0 6pt 0;
+    padding-left: 16pt;
+  }
+  li { margin-bottom: 2pt; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4pt 0 6pt 0;
+    font-size: 9pt;
+  }
+  th, td {
+    text-align: left;
+    padding: 4pt 6pt;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+  th {
+    background: #f1f5f9;
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  td.muted { color: #64748b; font-size: 8.5pt; }
+  .price { font-weight: 700; color: #0f172a; white-space: nowrap; }
+  .grid-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16pt;
+  }
+  footer {
+    margin-top: 12pt;
+    padding-top: 8pt;
+    border-top: 1px solid #cbd5e1;
+    color: #64748b;
+    font-size: 8pt;
+    line-height: 1.4;
+  }
+  footer strong { color: #475569; }
+  .small { font-size: 8.5pt; color: #475569; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div>
+      <div class="brand">Fair Winds Quantitative</div>
+      <div class="sub">Custom Trading Infrastructure · Scope of Work</div>
+    </div>
+    <div class="contact">
+      <strong>Hans Seraphim</strong><br />
+      hans@legnoai.com<br />
+      fairwinds.live
+    </div>
+  </header>
+
+  <p class="tagline">
+    Disciplined, validated, deployed on <em>your</em> stack — not ours. You own the code, the data, and every parameter.
+  </p>
+
+  <h2>What we build</h2>
+  <p>
+    Production-grade algorithmic trading infrastructure for sophisticated investors, family offices, and small RIAs.
+    The systems we deliver are backtest-first, risk-disciplined, and fully transparent: no opaque alpha boxes, no
+    SaaS lock-in, no overnight promises. Every promotion from paper to live is gated by mechanical walk-forward
+    validation against your strategy and your universe.
+  </p>
+  <ul>
+    <li><strong>Broker integration</strong> — Alpaca and Interactive Brokers (paper + live), atomic bracket orders, options support</li>
+    <li><strong>Market data</strong> — real chains + Greeks, earnings calendar, dynamic momentum scanner across ~4,500 tradeable US equities</li>
+    <li><strong>Risk discipline</strong> — CVaR daily-loss breaker, portfolio Greeks limits, concentration caps, atomic stop/target brackets</li>
+    <li><strong>Validation</strong> — walk-forward harness with documented promotion gates (no live trading without passing them)</li>
+    <li><strong>Dashboard</strong> — auth-gated portal at your domain, real-time equity curve, vs-SPY benchmark, full trade journal</li>
+  </ul>
+
+  <h2>Scope of work (4–6 weeks)</h2>
+  <table>
+    <thead><tr><th>Phase</th><th>Deliverable</th><th>Duration</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Discovery</strong></td><td>Universe definition, risk parameter calibration, strategy scoping document</td><td>Week 1</td></tr>
+      <tr><td><strong>Implementation</strong></td><td>Custom strategy code, broker integration, full test suite (100+ tests)</td><td>Week 2–3</td></tr>
+      <tr><td><strong>Validation</strong></td><td>Walk-forward backtest report with explicit OOS Sharpe / max DD / regime analysis</td><td>Week 3–4</td></tr>
+      <tr><td><strong>Deployment</strong></td><td>Live dashboard at your domain, paper-trading harness, operational runbook</td><td>Week 4–5</td></tr>
+      <tr><td><strong>Onboarding</strong></td><td>Live promotion (only if validation gates pass), 90-day support window</td><td>Week 5–6+</td></tr>
+    </tbody>
+  </table>
+
+  <div class="grid-two">
+    <div>
+      <h2>Deliverables</h2>
+      <ul>
+        <li><strong>Source code</strong> — yours to keep; no licensing fees</li>
+        <li><strong>Deployed dashboard</strong> at your custom domain</li>
+        <li><strong>Walk-forward validation report</strong> with documented gates</li>
+        <li><strong>Operational runbook</strong> for your team</li>
+        <li><strong>90 days of post-deployment support</strong> included</li>
+        <li><strong>Promotion gate</strong> — system stays paper-only until OOS Sharpe &gt; 0.7 and max DD &lt; 25%</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Engagement &amp; pricing</h2>
+      <table>
+        <tbody>
+          <tr><td>Discovery + Scoping</td><td class="price">$2,500</td></tr>
+          <tr><td>Custom Deployment</td><td class="price">$25k–$45k</td></tr>
+          <tr><td>Ongoing Maintenance (optional)</td><td class="price">$1,500–$3,000/mo</td></tr>
+          <tr><td>Custom Strategy Development</td><td class="price">$400/hr</td></tr>
+        </tbody>
+      </table>
+      <p class="small">Deployment range depends on universe size, strategy complexity, and dashboard customization. Discovery fixes scope and price before any build work begins.</p>
+    </div>
+  </div>
+
+  <footer>
+    <strong>What we do not do.</strong> This engagement is software development and infrastructure consulting — <em>not</em> investment advice.
+    We do not recommend specific securities, promise returns of any kind, trade on your behalf, or provide tax or legal advice.
+    The client remains solely responsible for trading decisions, strategy parameter choices, and the regulatory implications of operating an
+    automated trading system. Past performance is not indicative of future results.
+  </footer>
+
+</div>
+</body>
+</html>
