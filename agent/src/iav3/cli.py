@@ -16,8 +16,14 @@ from __future__ import annotations
 import argparse
 import sys
 
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
+
+# Load .env BEFORE any command function reads os.environ. python-dotenv walks
+# upward from the CWD looking for a .env file, so this works whether the user
+# runs iav3 from the repo root, the agent dir, or anywhere in between.
+load_dotenv()
 
 from .backtest import run_backtest, run_portfolio_backtest
 from .backtest.metrics import compute_metrics
