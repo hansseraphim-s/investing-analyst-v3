@@ -585,7 +585,56 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ve.set_defaults(func=cmd_validate_env)
 
+    sc = sub.add_parser(
+        "scan",
+        help="Run the dynamic momentum scan; print the top-N composite picks",
+    )
+    sc.add_argument("--top-n", dest="top_n", type=int, default=20)
+    sc.set_defaults(func=cmd_scan)
+
     return p
+
+
+def cmd_scan(args: argparse.Namespace) -> int:
+    """Run the dynamic universe + multi-factor scan; print top-N to terminal.
+
+    Useful for previewing what `iav3 paper` with ENABLE_DYNAMIC_SCAN=true
+    would select. Doesn't trade; doesn't write to journals.
+    """
+    from .data import fetch_us_equity_universe, scan_top_n
+
+    try:
+        uni = fetch_us_equity_universe()
+        console.print(f"[dim]Universe: {len(uni)} tradeable / fractionable / shortable equities[/dim]")
+    except Exception as e:
+        console.print(f"[red]Universe fetch failed: {e}[/red]")
+        return 1
+
+    try:
+        top = scan_top_n(uni, top_n=args.top_n)
+    except Exception as e:
+        console.print(f"[red]Scan failed: {e}[/red]")
+        return 1
+
+    if not top:
+        console.print("[yellow]Scan returned 0 picks (no symbols with usable history?)[/yellow]")
+        return 1
+
+    t = Table(title=f"Top {args.top_n} by composite momentum z-score")
+    for col in ("#", "Symbol", "Composite", "20d Ret", "60d Ret", "Trend", "Vol Ratio"):
+        t.add_column(col, justify="right" if col not in ("Symbol",) else "left")
+    for i, r in enumerate(top, 1):
+        t.add_row(
+            str(i),
+            r.symbol,
+            f"{r.composite:+.2f}",
+            f"{r.m20:+.1%}",
+            f"{r.m60:+.1%}",
+            f"{r.trend:+.1%}",
+            f"{r.vol_ratio:.2f}x",
+        )
+    console.print(t)
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

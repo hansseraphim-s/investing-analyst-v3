@@ -175,6 +175,29 @@ def run_cycle(settings: Settings, *, verbose: bool = True) -> str:
     log(f"[bold]Cycle {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}[/bold] "
         f"· mode={settings.trading_mode} · strategy={strategy.name}")
 
+    # Dynamic universe scan (optional). When ENABLE_DYNAMIC_SCAN=true the
+    # engine fetches ~4,500 Alpaca-tradeable equities, ranks by multi-factor
+    # composite z-score (20d + 60d momentum + trend + vol confirmation), and
+    # uses the top-N as THIS CYCLE's watchlist instead of the static
+    # WATCHLIST from .env. Adds ~30-60 seconds to cycle wall-clock time.
+    if os.environ.get("ENABLE_DYNAMIC_SCAN", "false").lower() == "true":
+        try:
+            from .data import fetch_us_equity_universe, scan_top_n
+            top_n = int(os.environ.get("SCAN_TOP_N", "100"))
+            log(f"[dim]Dynamic scan: fetching universe + ranking top {top_n}…[/dim]")
+            uni = fetch_us_equity_universe()
+            top = scan_top_n(uni, top_n=top_n)
+            if top:
+                import dataclasses
+                dynamic_watchlist = [r.symbol for r in top]
+                settings = dataclasses.replace(settings, watchlist=dynamic_watchlist)
+                log(f"[dim]Scan picked {len(dynamic_watchlist)} symbols; top 5: "
+                    f"{', '.join(r.symbol for r in top[:5])}[/dim]")
+            else:
+                log("[yellow]Scan returned 0 symbols; falling back to static watchlist[/yellow]")
+        except Exception as e:
+            log(f"[yellow]Scan failed: {e}; falling back to static watchlist[/yellow]")
+
     # Open Neon session up front so we can stamp every write with session_id.
     acct = broker.get_account()
     neon, session_id = _maybe_open_neon_session(

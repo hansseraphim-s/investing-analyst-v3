@@ -15,6 +15,8 @@ from .indicators import (
     sma,
     true_range,
 )
+from .scanner import ScanResult, scan_top_n
+from .universe import fetch_us_equity_universe
 from .yfinance_feed import YFinanceData
 
 __all__ = [
@@ -26,13 +28,16 @@ __all__ = [
     "OptionContract",
     "OptionQuote",
     "Quote",
+    "ScanResult",
     "YFinanceData",
     "annualized_volatility",
     "atr",
     "daily_returns",
     "ema",
+    "fetch_us_equity_universe",
     "parse_occ",
     "rsi",
+    "scan_top_n",
     "sma",
     "true_range",
     "validate_ohlcv",
