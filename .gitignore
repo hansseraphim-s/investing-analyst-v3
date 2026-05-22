@@ -39,7 +39,10 @@ pnpm-debug.log*
 *.log
 *.sqlite
 *.sqlite3
+*.db
 journal.db
+trader_journal.db
+paper_state.db
 /data/
 .cache/
 
