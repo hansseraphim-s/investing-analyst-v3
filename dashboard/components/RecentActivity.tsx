@@ -1,6 +1,6 @@
 // Compact feed of recent orders — entry/exit/block actions sorted newest first.
 
-type ActivityRow = {
+export type ActivityRow = {
   submitted_at: string;
   symbol: string;
   side: string;

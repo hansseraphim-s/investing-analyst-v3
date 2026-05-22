@@ -1,7 +1,7 @@
 import { EquityChart } from "@/components/EquityChart";
 import { KpiTile } from "@/components/KpiTile";
 import { LiveIndicator } from "@/components/LiveIndicator";
-import { RecentActivity } from "@/components/RecentActivity";
+import { RecentActivity, type ActivityRow } from "@/components/RecentActivity";
 import { sql } from "@/lib/db";
 import { computeMetrics, type EquityPoint } from "@/lib/metrics";
 import { formatCurrency, formatPct } from "@/lib/utils";
@@ -35,7 +35,7 @@ async function getLiveSnapshot() {
     ORDER BY market_value DESC
   `;
 
-  const recentOrders = await sql`
+  const recentOrders = await sql<ActivityRow>`
     SELECT submitted_at, symbol, side, qty, price, status, reason
     FROM orders
     ORDER BY submitted_at DESC
