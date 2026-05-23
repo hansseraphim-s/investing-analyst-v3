@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Fair Winds Quantitative — Technical White Paper</title>
+<style>
+  @page { size: letter; margin: 0.7in 0.75in; }
+  @media print { .page-break { page-break-before: always; } }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #0f172a;
+    font-size: 10pt;
+    line-height: 1.45;
+    background: #fff;
+  }
+  .doc { max-width: 7in; margin: 0 auto; }
+  .cover {
+    text-align: center;
+    padding-top: 1.5in;
+  }
+  .cover .brand {
+    font-size: 22pt;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 8pt;
+  }
+  .cover .title {
+    font-size: 28pt;
+    font-weight: 300;
+    margin-bottom: 12pt;
+    line-height: 1.2;
+  }
+  .cover .subtitle {
+    font-size: 12pt;
+    color: #475569;
+    font-style: italic;
+    margin-bottom: 36pt;
+  }
+  .cover .meta {
+    font-size: 10pt;
+    color: #475569;
+    margin-top: 60pt;
+    border-top: 1px solid #cbd5e1;
+    padding-top: 16pt;
+  }
+  .cover .meta strong { color: #0f172a; }
+  h1 {
+    font-size: 18pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 18pt;
+    margin-bottom: 4pt;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 4pt;
+  }
+  h2 {
+    font-size: 13pt;
+    color: #0f172a;
+    margin-top: 16pt;
+    margin-bottom: 4pt;
+  }
+  h3 {
+    font-size: 11pt;
+    color: #334155;
+    margin-top: 10pt;
+    margin-bottom: 4pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  p { margin: 0 0 6pt 0; }
+  ul { margin: 4pt 0 6pt 18pt; padding: 0; }
+  li { margin-bottom: 3pt; }
+  strong { color: #0f172a; }
+  em { color: #475569; }
+  code, .mono {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 9pt;
+    color: #1e293b;
+    background: #f1f5f9;
+    padding: 1pt 4pt;
+    border-radius: 2pt;
+  }
+  pre {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 8.5pt;
+    color: #1e293b;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid #64748b;
+    padding: 8pt 10pt;
+    margin: 6pt 0;
+    line-height: 1.4;
+    overflow: hidden;
+    white-space: pre-wrap;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6pt 0;
+    font-size: 9pt;
+  }
+  th, td {
+    text-align: left;
+    padding: 4pt 6pt;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+  th {
+    background: #f1f5f9;
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .toc {
+    margin-top: 24pt;
+  }
+  .toc table { font-size: 10pt; }
+  .toc td { padding: 3pt 6pt; border: none; }
+  .toc .num { color: #64748b; width: 24pt; }
+  .toc .page { text-align: right; color: #64748b; width: 24pt; }
+  .callout {
+    border-left: 3px solid #f59e0b;
+    background: #fffbeb;
+    padding: 6pt 10pt;
+    margin: 8pt 0;
+    font-size: 9pt;
+  }
+  .callout strong { color: #b45309; }
+  .grid-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16pt;
+  }
+  .grid-three {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12pt;
+  }
+  .kpi {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4pt;
+    padding: 8pt 10pt;
+  }
+  .kpi .label {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+  }
+  .kpi .value {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 2pt;
+  }
+  .kpi .sub {
+    font-size: 8pt;
+    color: #64748b;
+    margin-top: 2pt;
+  }
+  footer-pg {
+    color: #94a3b8;
+    font-size: 8pt;
+    text-align: center;
+    margin-top: 14pt;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================== -->
+<!-- COVER PAGE                                                     -->
+<!-- ============================================================== -->
+<div class="doc cover">
+  <div class="brand">Fair Winds Quantitative</div>
+  <div class="title">Investing Analyst v3</div>
+  <div class="subtitle">A risk-disciplined, backtest-first algorithmic trading platform.<br/>Technical Architecture &amp; Investment Thesis White Paper.</div>
+
+  <div class="grid-three" style="margin-top: 36pt; max-width: 5.5in; margin-left: auto; margin-right: auto;">
+    <div class="kpi">
+      <div class="label">Source files</div>
+      <div class="value">98</div>
+      <div class="sub">Python + TypeScript</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Test suite</div>
+      <div class="value">183</div>
+      <div class="sub">all passing</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Equity universe</div>
+      <div class="value">~4,400</div>
+      <div class="sub">scanned each cycle</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <strong>Hans Seraphim</strong> · Fair Winds Quantitative<br/>
+    hans@legnoai.com · <a href="https://fairwinds.live">fairwinds.live</a><br/>
+    Live dashboard: <a href="https://dashboard.fairwinds.live">dashboard.fairwinds.live</a><br/>
+    Source: <a href="https://github.com/hansseraphim-s/investing-analyst-v3">github.com/hansseraphim-s/investing-analyst-v3</a><br/>
+    May 2026
+  </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- TOC                                                            -->
+<!-- ============================================================== -->
+<div class="doc page-break">
+  <h1>Contents</h1>
+  <div class="toc">
+    <table>
+      <tr><td class="num">1.</td><td>Executive summary</td><td class="page">3</td></tr>
+      <tr><td class="num">2.</td><td>Investment thesis</td><td class="page">3</td></tr>
+      <tr><td class="num">3.</td><td>System architecture</td><td class="page">4</td></tr>
+      <tr><td class="num">4.</td><td>Trading strategy stack</td><td class="page">5</td></tr>
+      <tr><td class="num">5.</td><td>Risk management layers</td><td class="page">6</td></tr>
+      <tr><td class="num">6.</td><td>A trading day, step by step</td><td class="page">7</td></tr>
+      <tr><td class="num">7.</td><td>Validation methodology</td><td class="page">8</td></tr>
+      <tr><td class="num">8.</td><td>Technology stack &amp; infrastructure</td><td class="page">9</td></tr>
+      <tr><td class="num">9.</td><td>Honest limitations &amp; caveats</td><td class="page">9</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- 1. EXECUTIVE SUMMARY + 2. INVESTMENT THESIS                    -->
+<!-- ============================================================== -->
+<div class="doc page-break">
+  <h1>1. Executive summary</h1>
+  <p>
+    Investing Analyst v3 is a production-grade algorithmic trading platform built for sophisticated retail and family-office investors. The system pairs a Python trading agent with a real-time, colleague-shareable dashboard. It is <strong>backtest-first, risk-disciplined, and explicitly transparent</strong>: every parameter is documented, every promotion from paper to live is gated by mechanical validation, and no decision is delegated to an opaque large-language model.
+  </p>
+  <p>
+    The platform is currently running paper trading with a $103,000 simulated Alpaca account. It is configured for an aggressive 20%+ annualized return target, with the documented trade-off of accepting drawdowns up to 30-35% in adverse regimes. Live trading is structurally gated behind walk-forward validation that the current strategy stack has not yet passed — a feature, not a bug.
+  </p>
+
+  <h1>2. Investment thesis</h1>
+
+  <h2>What this system is designed to capture</h2>
+  <p>
+    The platform implements three well-documented sources of edge available to disciplined retail capital:
+  </p>
+  <ul>
+    <li><strong>Cross-sectional momentum</strong> — names already in established uptrends with elevated participation tend to continue outperforming over 1-3 month horizons. This is the canonical Jegadeesh-Titman effect, widely documented and persistent across decades.</li>
+    <li><strong>Volatility targeting</strong> — sizing positions inversely to recent realized volatility produces materially better risk-adjusted returns (Sharpe / Calmar) without claiming higher raw returns. The honest, repeatable effect is smoother drawdowns for a given exposure.</li>
+    <li><strong>Volatility risk premium</strong> — defined-risk options structures (long calls when IV rank is low, cash-secured puts on names the investor would own anyway) systematically harvest the gap between realized and implied volatility while bounding maximum loss.</li>
+  </ul>
+
+  <h2>What this system is explicitly NOT designed to do</h2>
+  <ul>
+    <li><strong>Predict markets.</strong> The agent does not forecast prices. It reacts to confirmed signals and bounds its losses when wrong.</li>
+    <li><strong>Trade naked options.</strong> The risk layer structurally rejects naked positions. All option exposure is either long (premium-defined loss) or cash/share-secured (assignment-defined loss).</li>
+    <li><strong>Let an LLM make trading decisions.</strong> Earlier prototypes did this and produced slow, non-deterministic, un-backtestable behavior. The current architecture deliberately keeps Claude out of the decision path. AI is used for post-trade commentary only.</li>
+    <li><strong>Maximize raw return.</strong> The promotion gate explicitly favors risk-adjusted performance (Sharpe &gt; 0.7, max DD &lt; 25%) over absolute return. A strategy that returns 80% in one year and -40% the next does not promote.</li>
+  </ul>
+
+  <div class="callout">
+    <strong>Honest framing.</strong> Cross-sectional momentum, volatility targeting, and selling vol on names you'd own are well-known patterns. None is novel proprietary alpha. The edge this platform offers comes from <em>operational discipline</em> — atomic bracket orders, walk-forward validation, mechanical risk gates, and complete transparency — applied consistently to known patterns.
+  </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- 3. SYSTEM ARCHITECTURE                                         -->
+<!-- ============================================================== -->
+<div class="doc page-break">
+  <h1>3. System architecture</h1>
+
+  <h2>Component diagram</h2>
+<pre>
+                  ┌──────────────────────────────────────┐
+                  │  launchd cron (Mon-Fri, 12:30 PM PT) │
+                  └──────────────────┬───────────────────┘
+                                     ▼
+        ┌────────────────────────────────────────────────────────┐
+        │             Python trading agent (iav3)                │
+        │                                                        │
+        │   ┌──────────────────┐  ┌─────────────────────────┐    │
+        │   │ Universe fetcher │→ │ Multi-factor scanner    │    │
+        │   │  (Alpaca assets) │  │  (z-score top-100)      │    │
+        │   └──────────────────┘  └────────────┬────────────┘    │
+        │                                      │                 │
+        │                                      ▼                 │
+        │       ┌─────────────────────────────────────────┐      │
+        │       │  Strategy engine (vol_target_trend_*)   │      │
+        │       │  + Long-call overlay (IV-rank gated)    │      │
+        │       └────────────────────┬────────────────────┘      │
+        │                            ▼                           │
+        │       ┌─────────────────────────────────────────┐      │
+        │       │  Risk layer (8 pre-trade checks)        │      │
+        │       │  Daily-loss + CVaR + Greeks + caps      │      │
+        │       └────────────────────┬────────────────────┘      │
+        │                            ▼                           │
+        │       ┌──────────────┐  ┌──────────────────────┐       │
+        │       │ Alpaca broker│  │ Local SQLite journal │       │
+        │       │ (paper/live) │  │ (trades_today auth)  │       │
+        │       └──────┬───────┘  └──────────────────────┘       │
+        └──────────────┼─────────────────────────────────────────┘
+                       ▼
+            ┌──────────────────────┐
+            │   Neon Postgres      │ ◄─── shared/schema.sql
+            │   (sessions, orders, │      8 tables
+            │    positions,        │
+            │    equity_curve, …)  │
+            └──────────┬───────────┘
+                       ▼
+       ┌────────────────────────────────────────┐
+       │  Next.js dashboard on Vercel           │
+       │  (Clerk auth, recharts, real-time)     │
+       │  ─ /live    /performance vs S&P 500    │
+       │  ─ /journal /strategies                │
+       │  ─ /risk    /health                    │
+       └────────────────────────────────────────┘
+                       ▲
+                       │ HTTPS, Clerk-gated
+                       ▼
+       Operator + invited colleagues
+       (dashboard.fairwinds.live)
+</pre>
+
+  <h2>Module responsibilities</h2>
+  <table>
+    <thead><tr><th>Module</th><th>Path</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td>Universe fetcher</td><td><code>data/universe.py</code></td><td>~4,400 Alpaca-tradeable equities (marginable + shortable + fractionable)</td></tr>
+      <tr><td>Scanner</td><td><code>data/scanner.py</code></td><td>Multi-factor z-score ranking; picks top-N for this cycle</td></tr>
+      <tr><td>Strategy</td><td><code>strategy/</code></td><td>vol_target_trend, momentum, mean_reversion + aggressive variant</td></tr>
+      <tr><td>Options data</td><td><code>data/alpaca_options.py</code></td><td>Real chains, IV rank, Greeks via Alpaca's options API</td></tr>
+      <tr><td>Wheel</td><td><code>options/wheel_live.py</code></td><td>Cash-secured-put + covered-call decision engine</td></tr>
+      <tr><td>Overlay</td><td><code>options/long_call_overlay.py</code></td><td>IV-rank-gated long-call overlay on trend signals</td></tr>
+      <tr><td>Risk</td><td><code>risk/manager.py</code></td><td>Pre-trade checks: cash, concentration, daily loss, CVaR, Greeks</td></tr>
+      <tr><td>Greeks aggregator</td><td><code>greeks/aggregator.py</code></td><td>Portfolio Δ / Γ / Vega / Θ + hard-cap checker</td></tr>
+      <tr><td>Backtest</td><td><code>backtest/</code></td><td>Event-driven engine + walk-forward harness</td></tr>
+      <tr><td>Broker</td><td><code>broker/alpaca.py</code></td><td>Atomic bracket orders + single-leg option orders</td></tr>
+      <tr><td>Neon journal</td><td><code>db/neon.py</code></td><td>Cloud journal store; dashboard read source</td></tr>
+      <tr><td>Engine</td><td><code>engine.py</code></td><td>Cycle orchestration: data → signal → risk → execution → journal</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================== -->
+<!-- 4. TRADING STRATEGY STACK                                      -->
+<!-- ============================================================== -->
+<div class="doc page-break">
+  <h1>4. Trading strategy stack</h1>
+
+  <h2>Layer 1: Dynamic universe selection</h2>
+  <p>
+    Each cycle, the agent fetches the current ~4,400 Alpaca-tradeable US equities (filtered to marginable, shortable, and fractionable — a proxy for genuine liquidity), then ranks them via a four-factor composite z-score:
+  </p>
+  <table>
+    <thead><tr><th>Factor</th><th>Definition</th><th>Captures</th></tr></thead>
+    <tbody>
+      <tr><td>20-day return</td><td>(Close − Close₋₂₁) / Close₋₂₁</td><td>Short-term momentum</td></tr>
+      <tr><td>60-day return</td><td>(Close − Close₋₆₁) / Close₋₆₁</td><td>Medium-term momentum</td></tr>
+      <tr><td>Trend strength</td><td>(Close − SMA₂₀₀) / SMA₂₀₀</td><td>Regime alignment</td></tr>
+      <tr><td>Volume ratio</td><td>Avg vol last 20d / avg vol prior 60d</td><td>Participation / confirmation</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Each factor is z-scored across the entire universe so they have comparable scale; the four z-scores are summed to a composite, sorted descending, and the top 100 become this cycle's watchlist. Hygiene filters drop penny stocks ($&lt;5), reverse-split data corruption (|60d return| &gt; 500%), and obvious halts (vol ratio &gt; 50x).
+  </p>
+
+  <h2>Layer 2: Equity entry signal (vol_target_trend_aggressive)</h2>
+  <p>
+    For each scanned name, an entry signal fires when <em>all three</em> conditions hold:
+  </p>
+  <ul>
+    <li>Fast EMA (10-day) is above slow EMA (50-day)</li>
+    <li>Close is above the 200-day SMA (regime filter)</li>
+    <li>Position not already held</li>
+  </ul>
+  <p>
+    Position size is computed by <strong>inverse-realized-volatility weighting</strong> targeting 20% annualized portfolio volatility, capped at the configured per-name concentration limit (20% of equity). When realized vol on the underlying is low, the strategy sizes up; when realized vol is high, it sizes down — automatically.
+  </p>
+
+  <h2>Layer 3: Risk-bracketed execution</h2>
+  <p>
+    Every entry is submitted as an atomic <strong>bracket order</strong>: market entry + ATR-based stop-loss + ATR-based take-profit, transmitted as a single Alpaca order so the position is never unprotected. Stop is set 2× ATR below entry; target is 4× ATR above entry (2:1 reward-to-risk).
+  </p>
+
+  <h2>Layer 4: IV-rank-gated long-call overlay (optional, opt-in)</h2>
+  <p>
+    When <code>ENABLE_OPTIONS_OVERLAY=true</code> and the equity trend signal is on for a name, the system additionally consults the long-call overlay. It fires only when:
+  </p>
+  <ul>
+    <li>IV rank &lt; 50 (calls are historically cheap on this name)</li>
+    <li>A liquid 60-DTE ATM call exists (bid &gt; 0, spread ≤ 20% of mid)</li>
+    <li>Sizing math works (12% of equity ≥ one contract cost)</li>
+  </ul>
+  <p>
+    When triggered, the system buys defined-risk long calls at limit (mid). Maximum loss is the premium paid; there is no naked exposure. The overlay accumulates IV history per symbol over time, and the gate is dormant for any symbol until 60+ daily IV observations exist — a structural bootstrap protection against acting on insufficient data.
+  </p>
+
+  <h2>Layer 5: Earnings-event wheel (architecturally ready, deferred)</h2>
+  <p>
+    The <code>WheelLive</code> module implements pre-earnings cash-secured-put selling on names the investor would own. It uses Finnhub's earnings calendar to identify positions with earnings in the next 3-14 days, confirms elevated IV, and sells defined-risk CSPs to harvest the volatility risk premium. The decision engine is built and unit-tested; engine integration is deferred pending walk-forward validation of the standalone equity stack.
+  </p>
+</div>
+
+<!-- ============================================================== -->
+<!-- 5. RISK MANAGEMENT                                             -->
+<!-- ============================================================== -->
+<div class="doc page-break">
+  <h1>5. Risk management layers</h1>
+
+  <p>Every order — equity or option, entry or exit — passes through a pure-function pre-trade check before submission to the broker. The check is deterministic, fully unit-tested, and takes all required state as explicit arguments (no clock reads, no global state, no race conditions).</p>
+
+  <h2>Pre-trade gates (in evaluation order)</h2>
+  <table>
+    <thead><tr><th>#</th><th>Gate</th><th>Trigger</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Input sanity</td><td>qty &gt; 0, price &gt; 0, portfolio equity &gt; 0</td></tr>
+      <tr><td>2</td><td>SELL-side ownership</td><td>Cannot sell what is not held; cannot oversell</td></tr>
+      <tr><td>3</td><td>Absolute daily-loss breaker</td><td>Halt new entries if day P&amp;L ≤ −6%</td></tr>
+      <tr><td>4</td><td><strong>CVaR daily-loss breaker</strong></td><td>Halt if day P&amp;L breaches the mean of the worst 5% of historical days. Arms automatically at 30+ sessions of journal data.</td></tr>
+      <tr><td>5</td><td>Prohibited symbols</td><td>Leveraged ETFs (TQQQ, SOXL, UVXY, …) blocked by policy</td></tr>
+      <tr><td>6</td><td>Per-order cap</td><td>Single order ≤ $10,000 notional</td></tr>
+      <tr><td>7</td><td>Daily trade frequency</td><td>≤ 20 orders per day (runaway-loop guard)</td></tr>
+      <tr><td>8</td><td>Concentration</td><td>Single name ≤ 20% of equity post-trade</td></tr>
+      <tr><td>9</td><td>Buying power</td><td>Order value ≤ available cash</td></tr>
+      <tr><td>10</td><td>Cash reserve</td><td>≥ 5% cash retained post-trade</td></tr>
+      <tr><td>11</td><td><strong>Portfolio Greeks</strong> (when options active)</td><td>|Δ| &lt; 1500, |Vega| &lt; 500, Θ &gt; −100/day, notional &lt; 1.5× equity</td></tr>
+    </tbody>
+  </table>
+
+  <h2>CVaR breaker — why it matters</h2>
+  <p>
+    An absolute "halt at −3%" cap overshoots in calm regimes and undershoots in high-vol regimes. The Conditional Value-at-Risk (CVaR) breaker compares today's day P&amp;L against the mean of the worst α-fraction of historical days (α = 5% by default). The threshold auto-adapts: in a low-volatility regime, the breaker becomes tighter; in a high-vol regime, it becomes looser. This prevents both nuisance halts during normal vol expansion and rubber-stamping of genuinely catastrophic days.
+  </p>
+  <p>
+    The CVaR layer is deliberately dormant until 30+ sessions of journal history exist. Below that threshold, the absolute breaker remains the only daily-loss protection — a documented safety state, not an oversight.
+  </p>
+
+  <h2>Atomic bracket orders</h2>
+  <p>
+    In the previous version (v2 → v3), the agent placed entry orders and then separately called the broker to set stop-loss orders. This created a window — typically 1-3 seconds — during which the position was unprotected. The v3 architecture uses Alpaca's <code>OrderClass.BRACKET</code>: entry, stop, and target submitted as one atomic operation. The position cannot exist on the broker's books without its protection levels also in place.
+  </p>
+
+  <h2>Promotion gate (paper → live)</h2>
+  <p>
+    Live trading is structurally gated. A strategy does not flip from <code>TRADING_MODE=PAPER</code> to <code>TRADING_MODE=LIVE</code> until:
+  </p>
+  <ul>
+    <li>Walk-forward aggregate OOS Sharpe &gt; 0.7 (default; loosened to 0.5 for the aggressive configuration)</li>
+    <li>Max OOS drawdown &lt; 25% (default; loosened to 35% for aggressive)</li>
+    <li>Worst single OOS window Sharpe &gt; −0.5 (default; loosened to −1.0 for aggressive)</li>
+    <li>≥ 30 sessions of paper trading where realized P&amp;L tracks backtest expectation within 15%</li>
+    <li>The operator manually flips the configuration flag</li>
+  </ul>
+</div>
+
+<!-- ============================================================== -->
+<!-- 6. A TRADING DAY                                               -->
+<!-- ============================================================== -->
+<div class="doc page-break">
+  <h1>6. A trading day, step by step</h1>
+
+  <p>Monday through Friday, 12:30 PM Pacific Time (3:30 PM Eastern, 30 minutes before NYSE close):</p>
+
+  <table>
+    <thead><tr><th>Time</th><th>Step</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>12:30:00</td><td>1</td><td>macOS <code>launchd</code> fires the configured job. Wrapper script activates the Python virtualenv and runs <code>iav3 paper</code>.</td></tr>
+      <tr><td>12:30:01</td><td>2</td><td>Health gate: <code>iav3 validate-env</code> pings Alpaca, Finnhub, Anthropic, and Neon. Logs pass/fail for each.</td></tr>
+      <tr><td>12:30:03</td><td>3</td><td>Open Neon session row with starting equity, mode, strategy, agent version.</td></tr>
+      <tr><td>12:30:04</td><td>4</td><td>Alpaca market clock checked. If closed (weekend / holiday / outside hours), log "market closed" and skip to step 12.</td></tr>
+      <tr><td>12:30:05</td><td>5</td><td><strong>Universe fetch</strong> — pull ~4,400 tradeable US equities from Alpaca.</td></tr>
+      <tr><td>12:30:06</td><td>6</td><td><strong>Scanner</strong> — batched bars fetch (100 symbols / call), compute four-factor composite, rank, pick top 100.</td></tr>
+      <tr><td>12:30:45</td><td>7</td><td>For each of the 100 top-ranked symbols, in sequence: fetch historical OHLCV, run strategy.generate(), produce trend signal + ATR + target weight.</td></tr>
+      <tr><td>12:31:30</td><td>8</td><td>For each new entry candidate: build projected portfolio Greeks, run all 11 pre-trade checks. Blocked orders logged to journal with reason code.</td></tr>
+      <tr><td>12:31:35</td><td>9</td><td>Approved orders submitted to Alpaca as atomic bracket orders. Filled at next available price; stop and target levels active immediately.</td></tr>
+      <tr><td>12:31:40</td><td>10</td><td>Long-call overlay consulted per symbol with trend=1. If gate passes (trend on AND IV rank &lt; 50 AND liquidity OK AND sizing fits), submit option order at mid limit.</td></tr>
+      <tr><td>12:31:55</td><td>11</td><td>Snapshot all open positions to Neon. Record equity point. Compute and log portfolio Greeks.</td></tr>
+      <tr><td>12:31:58</td><td>12</td><td>Close Neon session with final equity, cash, day P&amp;L, and full session log. Optionally invoke Claude advisor for plain-English commentary on the cycle.</td></tr>
+      <tr><td>12:32:00</td><td>13</td><td>Process exits. Dashboard reflects new state within seconds (Vercel CDN refreshes the page on next view).</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Between cycles</h2>
+  <p>
+    Bracket orders placed at Alpaca remain active 24/7 within their day-or-GTC time-in-force. If a position's stop or target is hit between agent cycles (overnight, weekend), Alpaca fills it autonomously. The agent does not need to be running for risk protection to fire.
+  </p>
+
+  <h2>Failure modes &amp; what happens</h2>
+  <table>
+    <thead><tr><th>Failure</th><th>System behavior</th></tr></thead>
+    <tbody>
+      <tr><td>Alpaca API down</td><td>Cycle aborts; logs the error; no positions affected; next cycle retries</td></tr>
+      <tr><td>Finnhub rate-limited</td><td>Earnings-aware features degrade silently; equity logic continues</td></tr>
+      <tr><td>Neon DB unreachable</td><td>Local SQLite journal still writes; risk-layer reads from local; dashboard shows last cached state</td></tr>
+      <tr><td>Anthropic API down</td><td>Advisor commentary skipped; cycle continues normally</td></tr>
+      <tr><td>Machine offline</td><td>Cycle is missed for that day. Bracket orders at Alpaca remain active. Agent picks up at the next scheduled time.</td></tr>
+      <tr><td>Risk gate trips</td><td>Order is blocked, reason code recorded to journal, cycle continues with remaining symbols</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================== -->
+<!-- 7. VALIDATION                                                  -->
+<!-- ============================================================== -->
+<div class="doc page-break">
+  <h1>7. Validation methodology</h1>
+
+  <h2>Walk-forward, not in-sample backtest</h2>
+  <p>
+    A traditional in-sample backtest fits parameters to history and reports the resulting performance. This systematically overstates the realistic edge of any strategy because the parameters themselves were chosen with knowledge of the test data. Walk-forward validation breaks this loop:
+  </p>
+  <ul>
+    <li>Slice history into rolling windows: 36-month in-sample (IS) followed by 6-month out-of-sample (OOS), advanced 6 months at a time.</li>
+    <li>For each window: grid-search parameters on the IS data, optimizing in-sample Sharpe.</li>
+    <li>Lock in the IS-optimal parameters. Run the strategy on the OOS data with those exact parameters.</li>
+    <li>Report aggregate OOS metrics. The strategy has no knowledge of OOS data during parameter selection.</li>
+  </ul>
+
+  <h2>Promotion gate (current configuration)</h2>
+  <table>
+    <thead><tr><th>Metric</th><th>Default gate</th><th>Aggressive (current)</th><th>Rationale</th></tr></thead>
+    <tbody>
+      <tr><td>Aggregate OOS Sharpe</td><td>&gt; 0.7</td><td>&gt; 0.5</td><td>Risk-adjusted return floor</td></tr>
+      <tr><td>Max OOS drawdown</td><td>&lt; 25%</td><td>&lt; 35%</td><td>Worst-case capital preservation</td></tr>
+      <tr><td>Worst window Sharpe</td><td>&gt; −0.5</td><td>&gt; −1.0</td><td>Regime robustness (no single-window collapse)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Current baseline (May 2026)</h2>
+  <p>
+    The first formal walk-forward run, conducted on <code>vol_target_trend</code> at default parameters across AAPL, MSFT, NVDA, and SPY over 2015 → 2026:
+  </p>
+  <ul>
+    <li>Aggregate OOS Sharpe: <strong>0.54</strong> (below 0.7 default gate — fails)</li>
+    <li>Max OOS drawdown: <strong>24.4%</strong> (below 25% default — passes by a hair)</li>
+    <li>Worst window Sharpe: <strong>−3.87</strong> (well below −0.5 floor — fails badly)</li>
+    <li>Verdict: <strong>PROMOTION BLOCKED</strong></li>
+  </ul>
+  <p>
+    The gate worked as designed. A naive backtest of the same strategy reported strong in-sample Sharpe (0.5-2.0 range) that did not survive out-of-sample testing — specifically, the 2019-01 → 2022-01 windows uniformly failed as the COVID + rate-shock regime broke patterns learned 2016-2018. Documented in <code>docs/walk-forward-baseline-2026-05-22.md</code>.
+  </p>
+
+  <h2>Pending validation</h2>
+  <p>
+    The currently active <code>vol_target_trend_aggressive</code> configuration (fast EMA 10, slow EMA 50, target vol 0.20) has not yet been walk-forward-tested. The combined system (dynamic scanner + aggressive strategy + long-call overlay) is being validated through paper trading. Before any consideration of a live promotion, the combined system must pass a fresh walk-forward retest with its loosened gates.
+  </p>
+</div>
+
+<!-- ============================================================== -->
+<!-- 8. TECH STACK + 9. CAVEATS                                     -->
+<!-- ============================================================== -->
+<div class="doc page-break">
+  <h1>8. Technology stack &amp; infrastructure</h1>
+
+  <div class="grid-two">
+    <div>
+      <h3>Agent (Python)</h3>
+      <ul>
+        <li>Python 3.13</li>
+        <li>alpaca-py (broker + market data)</li>
+        <li>finnhub-python (earnings, news)</li>
+        <li>anthropic (advisor commentary)</li>
+        <li>pandas, numpy, scipy (compute)</li>
+        <li>psycopg (Neon Postgres)</li>
+        <li>pandas-market-calendars (NYSE schedule)</li>
+        <li>pytest (183 tests, all passing)</li>
+      </ul>
+
+      <h3>Dashboard (TypeScript)</h3>
+      <ul>
+        <li>Next.js 16 (App Router)</li>
+        <li>React 19</li>
+        <li>Tailwind CSS v4</li>
+        <li>Clerk (authentication)</li>
+        <li>@neondatabase/serverless (DB)</li>
+        <li>recharts (visualizations)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Hosting (all free tier)</h3>
+      <ul>
+        <li><strong>Vercel</strong> Hobby — dashboard hosting + CDN</li>
+        <li><strong>Neon</strong> free — 0.5 GB Postgres + 191 compute hrs/mo</li>
+        <li><strong>Clerk</strong> free — up to 10,000 monthly active users</li>
+        <li><strong>GitHub</strong> public repo — unlimited</li>
+        <li><strong>Domain</strong>: <code>fairwinds.live</code> at Squarespace</li>
+        <li><strong>Alpaca</strong> paper account — \$0/mo</li>
+        <li><strong>Finnhub</strong> free — 60 calls/min</li>
+      </ul>
+
+      <h3>Operations</h3>
+      <ul>
+        <li>macOS <code>launchd</code> for scheduled cycles</li>
+        <li>Logs to <code>~/Library/Logs/iav3/</code></li>
+        <li>Real-time dashboard at <code>dashboard.fairwinds.live</code></li>
+        <li>Total run cost: <strong>~$0.02/year</strong> (Anthropic API only)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h1>9. Honest limitations &amp; caveats</h1>
+
+  <ul>
+    <li><strong>Survivorship bias.</strong> Historical data sources (yfinance, Alpaca bars) reflect currently-listed companies. Delisted names, bankruptcies, and acquisitions are not in the backtest universe. Real historical returns would be somewhat lower than reported.</li>
+    <li><strong>Slippage model.</strong> Backtests apply a flat 5 basis points of slippage per fill. Real fills, especially on mid-cap names during volatility, will be worse. The actual broker fills via Alpaca's smart order router are typically tighter than this assumption, but cannot be guaranteed.</li>
+    <li><strong>Daily bars only.</strong> The strategy operates on daily-close data, not intraday. Intra-day moves are invisible to the signal generator. This is a deliberate simplicity choice; an intraday redesign is a separate, larger project.</li>
+    <li><strong>Aggressive configuration is not yet walk-forward validated.</strong> The current paper-trading configuration uses tighter parameters and looser gates that have not been retested against history. Validation is pending; current paper data is the bridging evidence.</li>
+    <li><strong>Earnings-event wheel is built but not wired.</strong> The <code>WheelLive</code> module is unit-tested and ready, but the engine does not yet invoke it. A separate development cycle is required to integrate, validate, and promote.</li>
+    <li><strong>Single-machine deployment.</strong> The agent runs on the operator's MacBook. If the machine is offline, scheduled cycles are missed. Bracket orders already placed remain active at Alpaca and execute autonomously, but new signals are not acted on until the machine is back online.</li>
+    <li><strong>No tax-loss harvesting, no tax-lot accounting.</strong> The system treats positions as fungible; it does not optimize for short- vs. long-term capital gains. Operators trading in taxable accounts must address this separately.</li>
+    <li><strong>This is not investment advice.</strong> Past performance does not predict future results. Backtests describe historical behavior, not future outcomes. The operator remains solely responsible for all trading decisions and the regulatory consequences of automated trading.</li>
+  </ul>
+
+  <div class="callout" style="margin-top: 16pt;">
+    <strong>The single most important framing.</strong> This platform is engineered to <em>measure</em> a strategy on history before risking capital, and to <em>structurally prevent</em> the failure modes that destroy retail accounts (unprotected positions, runaway losses, position concentration, naked options, decision-making under cognitive load). It is not a money-printing machine and was never designed to be one. The edge it offers is operational discipline applied consistently — not novel alpha.
+  </div>
+</div>
+
+</body>
+</html>
