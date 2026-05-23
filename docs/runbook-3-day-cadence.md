@@ -1,6 +1,6 @@
 # Operations runbook — AUTOMATED 5-day cadence, aggressive stack
 
-The agent now runs **automatically Mon-Fri at 12:30 PM PT (3:30 PM ET)**
+The agent now runs **automatically Mon-Fri at 6:25 AM PT (9:25 AM ET)**
 via macOS launchd. You don't need to remember to run anything. Logs
 land in `~/Library/Logs/iav3/`, dashboard updates in real time.
 
@@ -67,11 +67,11 @@ up the changes — no restart required.
 
 | Day | Time (PT) | Time (ET) | What happens |
 |---|---|---|---|
-| Monday | 12:30 PM | 3:30 PM | Automated cycle |
-| Tuesday | 12:30 PM | 3:30 PM | Automated cycle |
-| Wednesday | 12:30 PM | 3:30 PM | Automated cycle |
-| Thursday | 12:30 PM | 3:30 PM | Automated cycle |
-| Friday | 12:30 PM | 3:30 PM | Automated cycle |
+| Monday | 6:25 AM | 9:25 AM | Automated cycle |
+| Tuesday | 6:25 AM | 9:25 AM | Automated cycle |
+| Wednesday | 6:25 AM | 9:25 AM | Automated cycle |
+| Thursday | 6:25 AM | 9:25 AM | Automated cycle |
+| Friday | 6:25 AM | 9:25 AM | Automated cycle |
 
 Weekends + holidays: no cycle (Alpaca's `is_market_open()` returns
 False; the agent logs and exits without acting). Bracket orders

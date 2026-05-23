@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- launchd job for the iav3 paper trading cycle.
-     Fires Monday-Friday at 12:30 PM Pacific (= 3:30 PM Eastern, 30 min
-     before NYSE close). 30-min buffer was chosen for the 100-symbol
-     S&P 100 watchlist — a sequential cycle takes 5-7 minutes; 30 min
-     gives plenty of headroom even if API rate limits slow things
-     down. Adjust StartCalendarInterval Hour/Minute if you change
-     timezone or move to ET.
+     Fires Monday-Friday at 6:25 AM Pacific (= 9:25 AM Eastern, 5 min
+     before NYSE open). Matches the backtest convention: decide using
+     yesterday's confirmed close, execute at today's open. Cycle
+     completes in ~1.5-3 min so orders are queued before the 9:30 ET
+     bell. Adjust StartCalendarInterval Hour/Minute if you change
+     timezone or want to switch to an end-of-day schedule.
 
      Install:   bash scripts/install-launchd.sh
      Uninstall: bash scripts/uninstall-launchd.sh
@@ -29,28 +29,28 @@
     <array>
         <dict>
             <key>Weekday</key><integer>1</integer>
-            <key>Hour</key><integer>12</integer>
-            <key>Minute</key><integer>30</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>25</integer>
         </dict>
         <dict>
             <key>Weekday</key><integer>2</integer>
-            <key>Hour</key><integer>12</integer>
-            <key>Minute</key><integer>30</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>25</integer>
         </dict>
         <dict>
             <key>Weekday</key><integer>3</integer>
-            <key>Hour</key><integer>12</integer>
-            <key>Minute</key><integer>30</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>25</integer>
         </dict>
         <dict>
             <key>Weekday</key><integer>4</integer>
-            <key>Hour</key><integer>12</integer>
-            <key>Minute</key><integer>30</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>25</integer>
         </dict>
         <dict>
             <key>Weekday</key><integer>5</integer>
-            <key>Hour</key><integer>12</integer>
-            <key>Minute</key><integer>30</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>25</integer>
         </dict>
     </array>
 
