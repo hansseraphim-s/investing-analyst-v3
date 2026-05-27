@@ -217,6 +217,16 @@ def run_cycle(settings: Settings, *, verbose: bool = True) -> str:
     latest_prices: dict[str, float] = {}
     start = (datetime.now(timezone.utc) - timedelta(days=800)).date().isoformat()
 
+    # Track cash + trade count CONSUMED by approved entries within this cycle.
+    # The PortfolioView (pv) is computed once at cycle start; without these
+    # running totals, each per-symbol pre_trade_check would see the same
+    # cycle-start cash, allowing N concurrent entries that each individually
+    # pass the cash-reserve gate while collectively blowing past it
+    # (the bug that caused the 2026-05-27 over-buy event).
+    import dataclasses as _dc
+    cycle_committed_cash = 0.0
+    cycle_new_trades = 0
+
     for symbol in settings.watchlist:
         try:
             hist = feed.history(symbol, start=start)
@@ -285,13 +295,23 @@ def run_cycle(settings: Settings, *, verbose: bool = True) -> str:
             # option orders, the projection here will need to include the new option
             # too — but for the equity BUY path we're in right now, this is correct.
             returns_history = portfolio_returns_last_n(252)
+            # CRITICAL: use a PortfolioView reflecting cash + trade-count ALREADY
+            # consumed by earlier approved entries in THIS cycle. Without this,
+            # the cash-reserve gate uses cycle-start cash and lets all entries
+            # pass independently → can over-deploy by N× cash. (Fix for the
+            # 2026-05-27 over-buy event.)
+            pv_for_check = _dc.replace(
+                pv,
+                cash=pv.cash - cycle_committed_cash,
+                trades_today=pv.trades_today + cycle_new_trades,
+            )
             projected_greeks = _projected_greeks(
                 broker,
                 new_symbol=symbol, new_qty=qty, new_price=price,
-                equity=pv.equity, cash=pv.cash,
+                equity=pv_for_check.equity, cash=pv_for_check.cash,
             )
             decision = pre_trade_check(
-                "BUY", symbol, qty, price, pv, settings.risk,
+                "BUY", symbol, qty, price, pv_for_check, settings.risk,
                 returns_history=returns_history,
                 projected_greeks=projected_greeks,
                 greeks_limits=settings.risk.greeks_limits(),
@@ -314,6 +334,10 @@ def run_cycle(settings: Settings, *, verbose: bool = True) -> str:
                 continue
             broker.submit_bracket_order(symbol, qty, "BUY", price, stop, take)
             record_order(symbol, "BUY", qty, price, stop, take, "filled", "entry")
+            # Update running cycle totals so subsequent per-symbol checks see the
+            # cash that THIS entry just committed.
+            cycle_committed_cash += qty * price
+            cycle_new_trades += 1
             if neon and session_id is not None:
                 _safe_neon(
                     lambda s=symbol, q=qty, p=price, st=stop, tk=take: neon.record_order(
